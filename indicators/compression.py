@@ -1,6 +1,6 @@
 import pandas as pd
 from core.constants import mas_list, ma_groups
-from core.types import CompressionResult
+from core.my_data_types import CompressionResult
 
 
 def calculate_compression(data, ma_result):

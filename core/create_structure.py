@@ -5,7 +5,7 @@ structure = {
     "core": [
         "__init__.py",
         "constants.py",
-        "types.py",
+        "my_data_types.py",
         "utils.py",
     ],
     "data": [

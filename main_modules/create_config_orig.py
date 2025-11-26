@@ -2,8 +2,7 @@ import json
 import os
 import pandas as pd
 from datetime import datetime, timedelta
-import get_dictionary as gd
-from core.types import Config
+from core.my_data_types import Config, FileLocations, load_file_locations
 from core.constants import yahoo_market_details
 
 
@@ -11,6 +10,7 @@ from core.constants import yahoo_market_details
 def count_tickers(csv_path: str) -> int:
 #######################################################################################################
     """Return number of tickers in CSV (uses pandas; header 'Codes' is treated as column name)."""
+    print(f"csv path is: {csv_path}")
     if not csv_path or csv_path.lower() == "none":
         return 0
     if not os.path.exists(csv_path):
@@ -26,22 +26,25 @@ def count_tickers(csv_path: str) -> int:
 
 
 #######################################################################################################
-def what_do_you_want_to_do(mkt_details: Config, codes_to_download_folder):
+def what_do_you_want_to_do():
 #######################################################################################################
+
+
+    fileloc = load_file_locations()
 
     hoje = datetime.now()
     reference_time = 18
     default_start_date = "2020-01-01"  # used for initial testing
 
-    markets = {k: v for k, v in mkt_details.items() if v["codes_csv"] != "none"}
+    markets = {k: v for k, v in yahoo_market_details.items() if v["codes_csv"] != "none"}
 
     # Set default values to avoid "Local variable 'xxx' might be referenced before assignment"
     ###########################################################################################
-    market_to_plot = {1:mkt_details[1]}
+    markt_to_study = {1:markets[1]}
 
-    # print(f"default chosen market: ", market_to_plot)
+    # print(f"default chosen market: ", markt_to_study)
     ################################
-    update = market_to_plot
+    update = markt_to_study
     # print(f"default update market: ", update)
     ################################
     chosen_lookback = 252  # 1 yr
@@ -52,13 +55,13 @@ def what_do_you_want_to_do(mkt_details: Config, codes_to_download_folder):
     study_start_date = None
     study_end_date = None
     ###########################################################################################
-    # --- Compute num_tickers for default market_to_plot immediately ---
-    # market_to_plot is a dict like {"1": {...}}
-    default_key = next(iter(market_to_plot))  # default is 1
-    default_info = market_to_plot[default_key]
+    # --- Compute num_tickers for default markt_to_study immediately ---
+    # markt_to_study is a dict like {"1": {...}}
+    default_key = next(iter(markt_to_study))  # default is 1
+    default_info = markt_to_study[default_key]
     csv_filename = default_info.get("codes_csv", "none")
     # build full path using your folder variable
-    csv_path = os.path.join(codes_to_download_folder, csv_filename)
+    csv_path = os.path.join(fileloc.codes_to_download_folder, csv_filename)
 
     num_tickers = count_tickers(csv_path)
 
@@ -90,31 +93,31 @@ def what_do_you_want_to_do(mkt_details: Config, codes_to_download_folder):
         # print('\n*******************************************************')
         # print('** Plot BVSP, update BVSP, 252 days lookback (Default) **')
         # print('*********************************************************')
-        # Use default for market_to_plot
+        # Use default for markt_to_study
         # Use default for update
         chosen_lookback = 252  # 1 yr
         end_date = end_download_on
         study_end_date = None
-        # market_to_plot already default; num_tickers already set above
+        # markt_to_study already default; num_tickers already set above
 
     elif objective == 2:  # Plot BVSP, update all, 1008 days lookback
         # print('\n*********************************************')
         # print('** Plot BVSP, update all, 1008 days lookback **')
         # print('***********************************************')
-        # Use default for market_to_plot
+        # Use default for markt_to_study
         update = markets
         chosen_lookback = 1008  # 4yrs
         end_date = end_download_on
         study_end_date = None
-        # market_to_plot already default; num_tickers already set above
+        # markt_to_study already default; num_tickers already set above
 
     elif objective == 3:  # Choose: market to plot, update all/market to plot, lookback or study period
-        market_to_plot, num_tickers = which_market_to_study(mkt_details, codes_to_download_folder)
+        markt_to_study, num_tickers = which_market_to_study(fileloc.codes_to_download_folder)
         print("\nChoose either: 1 = 'Lookback' (e.g., 252 days) or 2 = Explicit end date (YYYYMMDD) + lookback")
         choice = input("Choose 1 or 2 (<Enter> for 1): ").strip() or "1"
         if choice == "1":
             chosen_lookback = how_far_to_lookback()
-            update = which_markets_to_download(mkt_details, market_to_plot)
+            update = which_markets_to_download(markets, markt_to_study)
         elif choice == "2":
             study_end_date_str = None  # input("Enter end date (YYYYMMDD): ").strip()
             update = None
@@ -170,8 +173,8 @@ def what_do_you_want_to_do(mkt_details: Config, codes_to_download_folder):
         # Convert DDMMYYYY to YYYY-MM-DD
         #start_download_on = datetime.strptime(start, "%d%m%Y").strftime("%Y-%m-%d")
 
-        market_to_plot, num_tickers = which_market_to_study(mkt_details, codes_to_download_folder)
-        update = which_markets_to_download(mkt_details, market_to_plot)
+        markt_to_study, num_tickers = which_market_to_study(fileloc.codes_to_download_folder)
+        update = which_markets_to_download(markets, markt_to_study)
         chosen_lookback = how_far_to_lookback()
         end_date = get_update_date(hoje, reference_time)
         study_start_date = None
@@ -181,15 +184,18 @@ def what_do_you_want_to_do(mkt_details: Config, codes_to_download_folder):
         # print('\n***************************')
         # print('** Testing (DOW/50d **')
         # print('***************************')
-        market_to_plot = {"13":mkt_details["13"]}
-        # update = market_to_plot
-        update = which_markets_to_download({"13": mkt_details["13"]}, {"13": mkt_details["13"]})
+        markt_to_study = {13:markets[13]}
+        # update = markt_to_study
+        update = which_markets_to_download({13: markets[13]}, {13: markets[13]})
         chosen_lookback = 50
         end_date = end_download_on
-        study_start_date = None
         study_end_date = None
-        # compute num_tickers for the test market (13)
-        num_tickers = count_tickers(mkt_details["13"].get("codes_csv", "none"))
+        # 1. Get the filename ('TEST')
+        csv_filename = markets[13].get("codes_csv", "none")
+        # 2. Construct the full path
+        csv_path = os.path.join(fileloc.codes_to_download_folder, csv_filename)
+        # 3. Call count_tickers with the path
+        num_tickers = count_tickers(csv_path)
 
 #####################################################################################
     # Ensure "yahoo_end_date" is one day after "end_date". YFinance end_date is EXCLUSIVE
@@ -213,11 +219,11 @@ def what_do_you_want_to_do(mkt_details: Config, codes_to_download_folder):
 
     config = Config(
         to_do=objective,
-        market_to_study=market_to_plot,
+        market_to_study=markt_to_study,
         number_tickers=num_tickers,
         to_update=update,
         graph_lookback=chosen_lookback,
-        first_date_to_download=start_download_on,
+        yahoo_start_date=start_download_on,
         last_date_to_download=end_date,
         yahoo_end_date=yahoo_end_date,
         study_end_date=study_end_date
@@ -227,7 +233,7 @@ def what_do_you_want_to_do(mkt_details: Config, codes_to_download_folder):
 
 
 #######################################################################################################
-def which_market_to_study(dictionary, codes_to_download_folder):
+def which_market_to_study(codes_to_download_folder):
     """
         Parameters:
             dictionary: yahoo_market_details
@@ -238,7 +244,7 @@ def which_market_to_study(dictionary, codes_to_download_folder):
 #######################################################################################################
 
     # Keep only markets that have an associated CSV of tickers
-    markets = {k: v for k, v in dictionary.items() if v["codes_csv"] != "none"}
+    markets = {k: v for k, v in yahoo_market_details.items() if v["codes_csv"] != "none"}
 
     """print(f"dictionary keys: {list(dictionary.keys())}")
     print(f"filtered markets: {list(markets.keys())}")
@@ -397,23 +403,13 @@ def get_update_date(hoje: datetime, reference_time: int) -> str:
 # FOLDER LOCATIONS
 #-------------------------------------------
 if __name__ == "__main__":
-    with open("file_locations.json", "r") as f:
-        paths = json.load(f)
-
-    downloaded_data_folder = paths["downloaded_data_folder"]
-    pdf_folder = paths["pdf_folder"]
-    codes_to_download_folder = paths["codes_to_download_folder"]
-    #yahoo_markets_dictionary = paths["yahoo_markets_dictionary"]
 
     hoje = datetime.now()
     reference_time = 18
     default_start_date = "2020-01-01"  # used for initial testing
 
-    #  ymd is standard Python dictionary in constants.py
-    ymd = yahoo_market_details
-
     # Creates a Config object
-    setup_dict = what_do_you_want_to_do(ymd, codes_to_download_folder)
+    setup_dict = what_do_you_want_to_do()
     # RETURNS:
         # "to_do": "objective"
         # "market_to_study": "chosen_market"

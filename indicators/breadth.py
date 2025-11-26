@@ -1,6 +1,6 @@
 import pandas as pd
 from core.constants import mas_list
-from core.types import BreadthResult
+from core.my_data_types import BreadthResult
 
 
 def calculate_breadth(data, ma_result):

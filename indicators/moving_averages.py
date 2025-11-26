@@ -1,6 +1,6 @@
 import pandas as pd
 from core.constants import mas_list
-from core.types import MAResult
+from core.my_data_types import MAResult
 
 
 def calculate_mas(data):
