@@ -64,7 +64,7 @@ class Config:
     """
     to_do: int  # what operations to perform
     market_to_study: dict  # key: int (1-5) value: dict (market, idx_code, codes_csv, number_tickers)
-    to_update: dict | None  # same idea as market_to_study, but might be all of them
+    to_update: dict | None  # Dictionary of one or all dictionaries in the same format as market_to_study
     graph_lookback: int  # lookback window length for charts
     yf_start_date: str  # begin download date, only used for starting fresh databases
     download_end_date: str  # last date you want included in the download
