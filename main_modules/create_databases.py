@@ -84,10 +84,11 @@ def create_databases(config, fileloc):
             tickers,
             start=config.yf_start_date,
             end=config.yf_end_date,
+            interval="1d",
             actions=True,
             auto_adjust=False,
             rounding=True,
-            group_by="ticker",
+            #group_by="ticker",
             progress=False
         )
 

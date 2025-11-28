@@ -56,7 +56,7 @@ def get_objective_from_user() -> int:
         1: "Plot BVSP, update BVSP, lookback 252 (Enter for 252)",
         2: "Plot BVSP, update all, choose lookback (Enter for 252)",
         3: "Choose: i) market to plot, ii) update all or only 'market to plot', iii) choose lookback or study period(?)",
-        4: "Create new databases. Choose: i) 'market to plot', ii) update all or 'market to plot', and iii) lookback",
+        4: "Create new databases. Choose: i) start date ii) mkt 2 study', iii) update all/mkt2study', iv) lookback",
         5: "TEST (creates new database ONLY for TEST)"
     }
 
@@ -108,22 +108,40 @@ def which_market_to_study(fileloc: FileLocations) -> Dict[int, dict]:
             print(f"Error parsing choice: {e}")
 
 
-def which_markets_to_download(selected: Dict[int, dict]) -> Dict[int, dict]:
+def which_markets_to_download(selected: Dict[int, dict], mode: str= 'update') -> Dict[int, dict]:
     """
     Ask user whether to update all markets or only the selected one(s).
     Returns a dictionary of markets to update. Ensures number_tickers attached.
     """
     markets = {k: v for k, v in yahoo_market_details.items() if v.get("codes_csv", "none") != "none"}
 
-    raw = input("Update all markets (1, default) or selected (2)? ").strip()
-    if not raw or raw == "1":
-        print("Will update all markets.")
+    if mode == 'update':
+        raw = input("Update all markets (1, default) or selected (2)? ").strip()
+        if not raw or raw == "1":
+            print("Will update all markets.")
+            return markets
+        if raw == "2":
+            print("Will update selected market.")
+            return selected
+        print("Invalid input; defaulting to all markets.")
         return markets
-    if raw == "2":
-        print("Will update selected market.")
-        return selected
-    print("Invalid input; defaulting to all markets.")
-    return markets
+
+    elif mode == "download":
+        raw = input("Create new files for: 1) ALL markets/default or 2) STUDY market? ").strip()
+
+        if not raw or raw == "1":
+            print("Will download and build all markets.")
+            return markets
+
+        if raw == "2":
+            print("Will download and build ONLY the study market.")
+            return selected
+
+        print("Invalid input; defaulting to ALL markets.")
+        return markets
+
+    else:
+        raise ValueError(f"Invalid mode '{mode}' supplied to which_markets_to_download")
 
 
 def how_far_to_lookback(default: int = 252) -> int:
@@ -163,9 +181,9 @@ def get_update_date(reference_time: int) -> str:
 def build_option_1_defaults(reference_time: int) -> dict:
     """Default: Plot BVSP, update BVSP, 252 days lookback."""
     markets = {k: v for k, v in yahoo_market_details.items() if v.get("codes_csv", "none") != "none"}
-
     market_to_study = {1: markets[1]}
     end_date = _today_or_yesterday_if_before_hour(reference_time)
+
     return {
         "objective": 1,
         "market_to_study": market_to_study,
@@ -197,14 +215,14 @@ def build_option_2_update_all(reference_time: int) -> dict:
     }
 
 
-def build_option_3_custom(reference_time: int) -> dict:
+def build_option_3_custom(fileloc: FileLocations, reference_time: int) -> dict:
     """
     Choose: i) market to plot, ii) update all or only 'market to plot', iii) choose lookback or study period(?),
     Returns params dictionary.
     """
     markets = {k: v for k, v in yahoo_market_details.items() if v.get("codes_csv", "none") != "none"}
     market_to_study = which_market_to_study(fileloc)
-    to_update = which_markets_to_download(market_to_study)
+    to_update = which_markets_to_download(market_to_study, mode="update")
     study_end_date = None
 
     while True:
@@ -247,9 +265,13 @@ def build_option_3_custom(reference_time: int) -> dict:
     }
 
 
-def build_option_4_build_databases(reference_time: int) -> dict:
+def build_option_4_build_databases(fileloc: FileLocations,  reference_time: int) -> dict:
     """
     Create new databases: ask for start date, choose market, update selection, choose lookback.
+    
+    Args:
+        reference_time: The reference time for date calculations
+        fileloc: FileLocations object containing paths to data files
     """
     # Get validated start date (DDMMYYYY -> YYYY-MM-DD) via parse_ddmmyyyy helper
     while True:
@@ -262,7 +284,7 @@ def build_option_4_build_databases(reference_time: int) -> dict:
 
     markets = {k: v for k, v in yahoo_market_details.items() if v.get("codes_csv", "none") != "none"}
     market_to_study = which_market_to_study(fileloc)
-    to_update = which_markets_to_download(market_to_study)
+    to_update = which_markets_to_download(market_to_study, mode="download")
     chosen_lookback = how_far_to_lookback()
     end_date = get_update_date(reference_time)
 
@@ -287,8 +309,6 @@ def build_option_5_test(reference_time: int) -> dict:
         market_to_study = {next(iter(yahoo_market_details)): next(iter(yahoo_market_details.values()))}
     else:
         market_to_study = {13: yahoo_market_details[13]}
-
-    to_update = market_to_study
 
     # Get validated start date
     while True:
@@ -326,7 +346,7 @@ def build_option_5_test(reference_time: int) -> dict:
     return {
         "objective": 5,
         "market_to_study": market_to_study,
-        "to_update": to_update,
+        "to_update": market_to_study,
         "graph_lookback": chosen_lookback,
         "yf_start_date": start_download_on,
         "download_end_date": end_date,
@@ -381,9 +401,9 @@ def what_do_you_want_to_do(fileloc) -> Config:
     elif objective == 2:
         params = build_option_2_update_all(reference_time)
     elif objective == 3:
-        params = build_option_3_custom(reference_time)
+        params = build_option_3_custom(fileloc, reference_time)
     elif objective == 4:
-        params = build_option_4_build_databases(reference_time)
+        params = build_option_4_build_databases(fileloc,reference_time)
     elif objective == 5:
         params = build_option_5_test(reference_time)
     else:

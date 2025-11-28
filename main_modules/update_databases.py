@@ -73,7 +73,7 @@ def update_databases(config, fileloc):
                     new_data = yf.download(idx_code,
                                            start=start_update,
                                            end=last_yahoo_date_to_download,
-                                           progress=True,  # show progress bar
+                                           progress=False,  # show progress bar
                                            rounding=True,
                                            auto_adjust=True
                                            )
@@ -114,7 +114,6 @@ def update_databases(config, fileloc):
 
         for key, info in config.to_update.items():
             market_name = info["market"]
-            csv_file = info["codes_csv"]
             comp_path = os.path.join(csv_folder, f"EOD_{market_name}.csv")
 
             try:
@@ -126,13 +125,16 @@ def update_databases(config, fileloc):
                 comp_df.index = pd.to_datetime(comp_df.index, errors="coerce")
                 comp_df = comp_df[comp_df.index.notna()]
                 comp_df = comp_df[~comp_df.index.duplicated(keep="first")]
+                if comp_df.empty:
+                    print(f"{market_name}: no existing component data, skipping.")
+                    continue
+
                 print(f"----------------- {market_name} last row before update--------------------")
                 print(comp_df.tail(1))
 
                 last_existing = comp_df.index[-1].date()
                 requested_last_date = datetime.strptime(last_date_to_download, "%Y-%m-%d").date()
-
-                if  comp_df.index[-1].date() >= requested_last_date:
+                if  last_existing >= requested_last_date:
                     print(f"-------------------- {market_name} already up-to-date -------------------------")
 
                 else:
@@ -145,7 +147,7 @@ def update_databases(config, fileloc):
                                           start=start_update_here,
                                           end=last_yahoo_date_to_download,
                                           group_by="ticker",
-                                          progress=True,
+                                          progress=False,
                                           rounding=True,
                                           auto_adjust=True,
                                           actions=True)
