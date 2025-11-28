@@ -33,8 +33,15 @@ def main():
     config = what_do_you_want_to_do(fileloc)
 
     # 3) Execute the requested action (update DB or rebuild DBs)
-    update_or_create_databases(config, fileloc)
+    index_df, components_df = update_or_create_databases(config, fileloc)
 
+    print(f"index_df last line:\n{index_df.tail(1)}")
+    print(f"components_df last line:\n{components_df.tail(1)}")
+
+
+###################################
+# Main
+###################################
 
 if __name__ == "__main__":
     main()

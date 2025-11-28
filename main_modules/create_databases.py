@@ -20,7 +20,9 @@ def create_databases(config, fileloc):
         fileloc.codes_to_download_folder
         fileloc.downloaded_data_folder
     """
-
+    #Initialise empty dfs
+    index_df = []
+    components_df = []
     # ---------------------------------------------------------
     # 1) Prepare folders
     # ---------------------------------------------------------
@@ -63,6 +65,13 @@ def create_databases(config, fileloc):
         )
         print(f"Saved: {idx_path}")
 
+        # If this is the market being studied → reload after update
+        market_info = next(iter(config.market_to_study.values()))  # Get the first (and only) market info
+        if idx_code == market_info['idx_code']:
+            index_df = pd.read_csv(idx_path, index_col=0, parse_dates=True)
+            index_df.index = pd.to_datetime(index_df.index, errors="coerce")
+            index_df = index_df[~index_df.index.duplicated(keep="first")]
+
         # -----------------------------------------------------
         # 4) Load tickers
         # -----------------------------------------------------
@@ -100,7 +109,28 @@ def create_databases(config, fileloc):
         comp_data.to_csv(comp_path)
         print(f"Saved: {comp_path}")
 
+        if market_name == market_info['market']:
+            components_df = pd.read_csv(comp_path,
+                                       index_col=0,
+                                       header=[0, 1],
+                                       parse_dates=True
+                                       )
+            components_df.index = pd.to_datetime(
+                components_df.index,
+                errors="coerce"
+            )
+            components_df = (
+                components_df)[~components_df.index.duplicated(keep="first")
+            ]
+
     print("\n✅ Database creation completed.")
+
+    return index_df, components_df
+
+
+###################################
+# Main for testing
+###################################
 
 if __name__ == "__main__":
     from pathlib import Path
