@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict
+import matplotlib.pyplot as plt
 import pandas as pd
 import json, os
 from pathlib import Path
@@ -100,7 +101,48 @@ class Config:
             return obj
             
         result = asdict(self)
+
         return convert(result)
+
+
+#==========================================================================================
+# Plotting
+#==========================================================================================
+# Dataclass to reduce repetitive plotting code
+@dataclass
+class PlotSetup:
+    """Container for all common plotting parameters."""
+    idx: str
+    mkt: str
+    slice_to_plot: pd.DataFrame
+    lookback_period: int
+    num_tickers: int
+    sample_start: str
+    sample_end: str
+    ymin: float
+    ymax: float
+    date_labels: list[str]
+    tick_positions: list[int]
+
+    def apply_xaxis(self, ax: plt.Axes):
+        """
+        Apply common x-axis formatting (ticks, labels, rotation)
+        to the provided Matplotlib axis.
+        """
+        # 'Date' is a column, tick_positions are integer offsets
+        ax.set_xticks(self.tick_positions)
+        ax.set_xticklabels(
+            [self.date_labels[i] for i in self.tick_positions],
+            rotation=45,
+            fontsize=8
+        )
+
+    def plot_price_layer(self, ax):
+        """Standard price plotting: black line + grey fill + y-limits."""
+        d = self.slice_to_plot
+        ax.plot(d.index, d["Adj Close"], color="black", linewidth=1.5, zorder=4)
+        ax.fill_between(d.index, d["Adj Close"], color="lightgrey")
+        ax.set_ylim(self.ymin, self.ymax)
 
 
 #==========================================================================================

@@ -4,12 +4,11 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from pathlib import Path
-# Load file locations + dataclasses
+
 from core.my_data_types import load_file_locations
-# Interactive config builder
 from main_modules.user_setup import what_do_you_want_to_do
-# Your run-task dispatcher (you will implement this soon)
 from main_modules.update_or_create import update_or_create_databases
+from utils.align_dataframes import align_and_prepare_for_plot
 
 #############################################
 # main.py — Central dispatcher for Structured_Breadth
@@ -32,11 +31,34 @@ def main():
     # 2) Run the full interactive setup
     config = what_do_you_want_to_do(fileloc)
 
-    # 3) Execute the requested action (update DB or rebuild DBs)
+    # 3) Execute the requested action (update DB or rebuild DBs) and align indexes
     index_df, components_df = update_or_create_databases(config, fileloc)
-
-    print(f"index_df last line:\n{index_df.tail(1)}")
+    """print(f"index_df last line:\n{index_df.tail(1)}")
+    print(f'Index type: {index_df.index.dtype}')
     print(f"components_df last line:\n{components_df.tail(1)}")
+    print(f'Index type: {components_df.index.dtype}')"""
+    index_df, components_df = align_and_prepare_for_plot(index_df, components_df)
+
+    ###################################
+    # 4) Indicator calculations
+    ###################################
+
+    # Close/Volume/OBV
+    from indicators.close_vol_obv import compute_close_vol_obv
+    index_df = compute_close_vol_obv(index_df)
+
+    ###################################
+    # 5) Plotting
+    ###################################
+    from plotting.common_plot_setup import prepare_plot_data
+    ps = prepare_plot_data(index_df, components_df, config)
+
+    # Close/Volume/OBV
+    from plotting.close_vol_obv import plot_close_vol_obv
+
+    fig = plot_close_vol_obv(ps, index_df)
+    plt.show()
+
 
 
 ###################################

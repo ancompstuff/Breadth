@@ -30,7 +30,7 @@ structure = {
     ],
     "plotting": [
         "__init__.py",
-        "setup.py",
+        "common_plot_setup.py",
         "index_vs_ma.py",
         "volume_plots.py",
         "highs_lows_plots.py",

@@ -65,7 +65,7 @@ def get_objective_from_user() -> int:
         print(f"{k}: {v}")
 
     while True:
-        raw = input("Enter your choice. <Return> for Default (1): ").strip() or "1"
+        raw = input("Enter your choice. <Return> for Default (1): ").strip() or "5"  # "1" put back after testing
         try:
             choice = int(raw)
             if choice in objective_options:
@@ -303,7 +303,7 @@ def build_option_4_build_databases(fileloc: FileLocations,  reference_time: int)
 def build_option_5_test(reference_time: int) -> dict:
     """Test case: small test market (13), create DB only for TEST."""
 
-    # pick market 13 if present
+    """# pick market 13 if present
     if 13 not in yahoo_market_details:
         print("Test market 13 not defined in yahoo_market_details.")
         market_to_study = {next(iter(yahoo_market_details)): next(iter(yahoo_market_details.values()))}
@@ -341,9 +341,9 @@ def build_option_5_test(reference_time: int) -> dict:
             except Exception:
                 print("❌ Invalid end date format. Expected DDMMYYYY. Please try again.")
                 study_end_date = None
-        chosen_lookback = how_far_to_lookback()
+        chosen_lookback = how_far_to_lookback()"""
 
-    return {
+    """return {
         "objective": 5,
         "market_to_study": market_to_study,
         "to_update": market_to_study,
@@ -352,7 +352,18 @@ def build_option_5_test(reference_time: int) -> dict:
         "download_end_date": end_date,
         #"yf_end_date": end_date,
         "study_end_date": study_end_date
-    }
+    }"""
+    return {
+            "objective": 5,
+            "market_to_study": {13: yahoo_market_details[13]},
+            "to_update": {13: yahoo_market_details[13]},
+            "graph_lookback": 252,
+            "yf_start_date": "2020-01-01",
+            "download_end_date": _today_or_yesterday_if_before_hour(reference_time),
+            #"yf_end_date": end_date,
+            "study_end_date": _today_or_yesterday_if_before_hour(reference_time)
+        }
+
 
 
 # ---------------------------------------------------------------------------
