@@ -1,4 +1,4 @@
-# indicators/indicator_bcb.py
+# indicators/bcb_align.py
 import pandas as pd
 
 def _ensure_ibov_adjclose(df_ibov):

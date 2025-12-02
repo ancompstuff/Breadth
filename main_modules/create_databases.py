@@ -146,7 +146,7 @@ def create_databases(config, fileloc):
         yyyy, mm, dd = s.split('-')
         return f"{dd}/{mm}/{yyyy}"
 
-    start_bcb = _to_ddmmyyyy(config.yf.start_date)
+    start_bcb = _to_ddmmyyyy(config.yf_start_date)
     end_bcb   = _to_ddmmyyyy(config.yf_end_date)
 
     # config.bcb_series was added at the start of create_databases

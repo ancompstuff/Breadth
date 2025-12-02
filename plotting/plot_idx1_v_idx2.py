@@ -1,137 +1,162 @@
-import os
-import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+import pandas as pd
 
-from indicators.indicator_bcb import selic_vs_index_df, ipca_vs_index_df
+from indicators.get_idx1_idx2 import get_idx1_idx2
 
 
-def plot_idx1_v_idx2(idx1, idx2, config, fileloc, ps):
+def plot_idx1_v_idx2(idx1, idx2, config, fileloc, plot_setup):
     """
-    idx1: primary index (must match ps.idx)
-    idx2: secondary index (e.g., 'BRL=X')
-    IBOV comes from PlotSetup.price_data.
-    idx2 and BCB series are loaded from CSV files.
+    Final version:
+        • Subplot 1 = IBOV (left) + idx2 (right) + correlation (far-right)
+        • Subplot 2 = IBOV (left) + SELIC% (right)
+        • Subplot 3 = IBOV (left) + IPCA%  (right)
+        • All share x-axis (labels only on bottom)
+        • Legends top-left
     """
 
-    lookback = int(getattr(config, "graph_lookback", 252))
-    csv_folder = fileloc.downloaded_data_folder
+    # ----------------------------------------------------------------------
+    # Load all aligned data (IBOV, idx2, SELIC, IPCA)
+    # ----------------------------------------------------------------------
+    df = get_idx1_idx2(idx1, idx2, config, fileloc, plot_setup)
+    df.index = pd.to_datetime(df.index)
 
-    # ---------------------------------------------------------
-    # 1) IBOV = ps.price_data (already aligned and trimmed)
-    # ---------------------------------------------------------
-    ibov_df = ps.price_data.tail(lookback).copy()
-    x = ps.plot_index[-len(ibov_df):]  # numeric x-axis
+    x = plot_setup.plot_index
 
-    # Detect price column
-    if "Adj Close" in ibov_df.columns:
-        ibov_col = "Adj Close"
-    elif "Close" in ibov_df.columns:
-        ibov_col = "Close"
-    else:
-        ibov_col = ibov_df.select_dtypes("number").columns[0]
+    col_ibov = "IBOV"
+    col_idx2 = idx2
+    col_selic = "SELIC"
+    col_ipca = "IPCA"
 
-    ibov_price = ibov_df[ibov_col].values
+    # ----------------------------------------------------------------------
+    # Prepare correlation
+    # ----------------------------------------------------------------------
+    corr_window = 20
 
-    # ---------------------------------------------------------
-    # 2) Load idx2 (secondary index) directly from CSV
-    # ---------------------------------------------------------
-    idx2_path = os.path.join(csv_folder, f"INDEX_{idx2}.csv")
-    if not os.path.exists(idx2_path):
-        raise RuntimeError(f"Cannot find file {idx2_path}")
+    # rolling correlation on aligned series
+    df["Correlation"] = (
+        df[col_ibov]
+        .rolling(corr_window)
+        .corr(df[col_idx2])
+    )
 
-    df_idx2 = pd.read_csv(idx2_path, index_col=0, parse_dates=True)
-    df_idx2 = df_idx2.loc[ibov_df.index].copy()  # align to IBOV datetime
+    # ----------------------------------------------------------------------
+    # Axes
+    # ----------------------------------------------------------------------
+    fig, axs = plt.subplots(3, 1, figsize=(18, 9), sharex=True)
+    ax_top, ax_selic, ax_ipca = axs
 
-    # detect idx2 price column
-    if "Adj Close" in df_idx2.columns:
-        idx2_col = "Adj Close"
-    elif "Close" in df_idx2.columns:
-        idx2_col = "Close"
-    else:
-        idx2_col = df_idx2.select_dtypes("number").columns[0]
+    # percentage formatter
+    # percent_fmt = FuncFormatter(lambda y, _: f"{y*100:.1f}%")
 
-    idx2_price = df_idx2[idx2_col].values
-
-    # ---------------------------------------------------------
-    # 3) Rolling correlation between IBOV and idx2
-    # ---------------------------------------------------------
-    corr_df = pd.DataFrame({
-        "IBOV": ibov_price,
-        "IDX2": idx2_price,
-    })
-
-    corr_df["Corr"] = corr_df.IBOV.rolling(20).corr(corr_df.IDX2)
-
-    # ---------------------------------------------------------
-    # 4) Load BCB monthly data (SELIC + IPCA)
-    # ---------------------------------------------------------
-    bcb_path = os.path.join(csv_folder, "bcb", "BCB_IPCA_SELIC.csv")
-    if not os.path.exists(bcb_path):
-        raise RuntimeError(f"Missing BCB file: {bcb_path}")
-
-    df_bcb = pd.read_csv(bcb_path, index_col=0, parse_dates=True)
-
-    # Forward-fill SELIC/IPCA to IBOV dates
-    df_selic = selic_vs_index_df(df_bcb, ibov_df)
-    df_ipca = ipca_vs_index_df(df_bcb, ibov_df)
-
-    # ---------------------------------------------------------
-    # 5) Prepare figure
-    # ---------------------------------------------------------
-    fig, (ax_corr, ax_selic, ax_ipca) = plt.subplots(3, 1, figsize=(18, 14), sharex=True)
-
-    # ---------------------------------------------------------
-    # Helper: IBOV shaded layer
-    # ---------------------------------------------------------
+    """# helper
     def draw_ibov(ax):
-        ps.plot_price_layer(ax)  # uses numeric index + grey shading
-        ax.set_ylabel("^BVSP", color="black")
+        plot_setup.plot_price_layer(ax)
+        ax.legend(loc="upper left")
 
-    # =========================================================
-    # Subplot 1 — IBOV vs idx2 + correlation
-    # =========================================================
-    draw_ibov(ax_corr)
+    draw_ibov(ax_top)"""
 
-    # idx2 line
-    ax_r = ax_corr.twinx()
-    ax_r.plot(x, idx2_price, color="green", linewidth=1.2)
+    plot_setup.plot_price_layer(ax_top)
+
+    # idx2 on right
+    ax_r = ax_top.twinx()
+    ax_r.plot(x, df[col_idx2].values, color="green", linewidth=1.2, label=idx2)
     ax_r.set_ylabel(idx2, color="green")
+    ax_r.tick_params(axis='y', labelcolor="green")
 
-    # correlation (3rd axis)
-    ax_c = ax_corr.twinx()
-    ax_c.spines["right"].set_position(("outward", 60))
-    ax_c.plot(x, corr_df["Corr"], color="blue", linewidth=1.4)
-    ax_c.axhline(0, color="blue", linestyle=":")
-    ax_c.set_ylim(-1.05, 1.05)
+    # correlation on FAR right
+    ax_corr = ax_top.twinx()
+    ax_corr.spines["right"].set_position(("outward", 50))
+    ax_corr.plot(x, df["Correlation"].values, color="blue", linewidth=1.3, label="Corr 20d")
+    ax_corr.set_ylabel("Correlation", color="blue")
+    ax_corr.tick_params(axis='y', labelcolor="blue")
+    ax_corr.set_ylim(-1.05, 1.05)
+    ax_corr.axhline(0, color='blue', linestyle='--', linewidth=1)
 
-    ax_corr.set_title(f"{idx1} vs {idx2} (20-day correlation)")
+    # ---- POSITIVE CORRELATION SHADING ----
+    corr = df["Correlation"].values
 
-    # =========================================================
-    # Subplot 2 — SELIC vs IBOV
-    # =========================================================
-    draw_ibov(ax_selic)
+    ax_corr.fill_between(
+        x,
+        0,
+        corr,
+        where=(corr > 0),
+        color="green",
+        alpha=0.25,
+        interpolate=True,
+        zorder=1
+    )
 
-    ax_s_r = ax_selic.twinx()
-    ax_s_r.plot(x, df_selic["SELIC"].values, linewidth=1.1)
-    ax_s_r.set_ylabel("SELIC", color="tab:blue")
+    ax_top.set_title(f"{idx1} vs {idx2} + Correlation ({plot_setup.sample_start}-{plot_setup.sample_end})")
+    ax_top.grid(True, axis='x', linestyle='--', alpha=0.4)
+    #ax_top.legend(loc="upper left")
 
-    ax_selic.set_title("SELIC vs ^BVSP")
+    # ---- MERGED LEGEND FOR 3 AXES ----
+    handles, labels = [], []
+    for ax in [ax_top, ax_r, ax_corr]:
+        h, l = ax.get_legend_handles_labels()
+        handles.extend(h)
+        labels.extend(l)
 
-    # =========================================================
-    # Subplot 3 — IPCA vs IBOV
-    # =========================================================
-    draw_ibov(ax_ipca)
+    ax_corr.legend(handles, labels, loc="upper left")
 
-    ax_i_r = ax_ipca.twinx()
-    ax_i_r.plot(x, df_ipca["IPCA"].values, linewidth=1.1, color="tab:orange")
-    ax_i_r.set_ylabel("IPCA", color="tab:orange")
+    # ----------------------------------------------------------------------
+    # 2) SELIC subplot
+    # ----------------------------------------------------------------------
+    #draw_ibov(ax_selic)
+    plot_setup.plot_price_layer(ax_selic)
 
-    ax_ipca.set_title("IPCA vs ^BVSP")
+    ax_selic_r = ax_selic.twinx()
+    ax_selic_r.plot(x, df[col_selic].values * 10, linewidth=1.2, color="tab:blue", label="SELIC (%)")
+    ax_selic_r.set_ylabel("SELIC (%)", color="tab:blue")
+    ax_selic_r.tick_params(axis='y', labelcolor="tab:blue")
+    #ax_selic_r.yaxis.set_major_formatter(percent_fmt)
+    ax_selic_r.grid(True, axis='y', linestyle='--', alpha=0.4)
 
-    # ---------------------------------------------------------
-    # Final shared x-axis (tick labels only on bottom subplot)
-    # ---------------------------------------------------------
-    ps.apply_xaxis(ax_ipca)
+    ax_selic.set_title("SELIC vs IBOV")
+    ax_selic.grid(True, axis='x', linestyle='--', alpha=0.4)
+    #ax_selic.legend(loc="upper left")
 
-    fig.tight_layout()
+    # ---- MERGED LEGEND FOR 2 AXES ----
+    handles, labels = [], []
+    for ax in [ax_selic, ax_selic_r]:
+        h, l = ax.get_legend_handles_labels()
+        handles.extend(h)
+        labels.extend(l)
+
+    ax_selic_r.legend(handles, labels, loc="upper left")
+
+    # ----------------------------------------------------------------------
+    # 3) IPCA subplot
+    # ----------------------------------------------------------------------
+    #draw_ibov(ax_ipca)
+    plot_setup.plot_price_layer(ax_ipca)
+
+    ax_ipca_r = ax_ipca.twinx()
+    ax_ipca_r.plot(x, df[col_ipca].values * 10, linewidth=1.2, color="tab:orange", label="IPCA (%)")
+    ax_ipca_r.set_ylabel("IPCA (%)", color="tab:orange")
+    ax_ipca_r.tick_params(axis='y', labelcolor="tab:orange")
+    #ax_ipca_r.yaxis.set_major_formatter(percent_fmt)
+    ax_ipca_r.grid(True, axis='y', linestyle='--', alpha=0.4)
+
+    ax_ipca.set_title("IPCA vs IBOV")
+    ax_ipca.grid(True, axis='x', linestyle='--', alpha=0.4)
+    #ax_ipca.legend(loc="upper left")
+
+    # ---- MERGED LEGEND FOR 2 AXES ----
+    handles, labels = [], []
+    for ax in [ax_ipca, ax_ipca_r]:
+        h, l = ax.get_legend_handles_labels()
+        handles.extend(h)
+        labels.extend(l)
+
+    ax_ipca_r.legend(handles, labels, loc="upper left")
+
+    ax_top.set_title(f"{idx1} vs {idx2} + Correlation")
+    ax_top.grid(True, axis='x', linestyle='--', alpha=0.4)
+
+    # bottom subplot gets x-axis labels
+    plot_setup.apply_xaxis(ax_ipca)
+
+    #fig.tight_layout()
     return fig

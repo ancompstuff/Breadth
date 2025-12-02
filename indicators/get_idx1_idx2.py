@@ -1,77 +1,92 @@
+# indicators/get_idx1_idx2.py
+
 import os
 import pandas as pd
+from .bcb_align import selic_vs_index_df, ipca_vs_index_df
 
-from indicators.indicator_bcb import selic_vs_index_df, ipca_vs_index_df
 
-
-def get_idx_idx2(idx1, idx2, ps, fileloc, lookback=252):
+def get_idx1_idx2(idx1, idx2, config, fileloc, plot_setup):
     """
-    Prepare a merged DataFrame containing:
+    Build a fully aligned dataframe containing:
 
-    - Adj Close of idx1 (taken from PlotSetup)
-    - Adj Close of idx2 (loaded from CSV)
-    - SELIC (aligned, forward-filled)
-    - IPCA (aligned, forward-filled)
+        IBOV (idx1)  - Adj Close
+        IDX2         - Adj Close
+        SELIC        - daily forward-filled
+        IPCA         - daily forward-filled
 
-    All aligned to idx1's date index and trimmed to lookback rows.
+    Master timeline = IBOV
+    Length = config.graph_lookback
     """
 
-    # ---------------------------------------------------------
-    # 1) IBOV / idx1 from PlotSetup
-    # ---------------------------------------------------------
-    df1 = ps.price_data.copy()
-    df1 = df1.tail(lookback)
+    lookback = int(getattr(config, "graph_lookback", 252))
 
-    if "Adj Close" in df1.columns:
-        col1 = "Adj Close"
-    elif "Close" in df1.columns:
-        col1 = "Close"
+    # ------------------------------------------------------------
+    # 1) Load idx1 from PlotSetup (always provided)
+    # ------------------------------------------------------------
+    df_idx1 = plot_setup.price_data.copy()
+    df_idx1.index = pd.to_datetime(df_idx1.index)
+    df_idx1 = df_idx1[['Adj Close']]  # enforce single close column
+    df_idx1.columns = ['IBOV']
+    df_idx1 = df_idx1.tail(lookback)
+
+    # IBOV defines the master daily timeline
+    timeline = df_idx1.index
+
+    # ------------------------------------------------------------
+    # 2) Load idx2 from yahoo_downloaded_data_folder
+    # ------------------------------------------------------------
+    yahoo_folder = fileloc.yahoo_downloaded_data_folder
+    f2 = os.path.join(yahoo_folder, f"INDEX_{idx2}.csv")
+
+    if not os.path.exists(f2):
+        raise FileNotFoundError(f"idx2 CSV not found: {f2}")
+
+    df_idx2_raw = pd.read_csv(f2, index_col=0, parse_dates=True)
+    df_idx2_raw.index = pd.to_datetime(df_idx2_raw.index)
+
+    # pick price column
+    if "Adj Close" in df_idx2_raw.columns:
+        s2 = df_idx2_raw["Adj Close"]
     else:
-        col1 = df1.select_dtypes("number").columns[0]
+        numeric_cols = df_idx2_raw.select_dtypes(include='number').columns
+        if len(numeric_cols) == 0:
+            raise ValueError(f"No numeric columns in {idx2} CSV.")
+        s2 = df_idx2_raw[numeric_cols[0]]
 
-    df_out = pd.DataFrame(index=df1.index)
-    df_out[f"{idx1}_Close"] = df1[col1]
+    # align idx2 to IBOV timeline
+    s2 = s2.reindex(timeline).ffill()
+    df_idx2 = pd.DataFrame({idx2: s2}, index=timeline)
 
-    # ---------------------------------------------------------
-    # 2) Load idx2 from CSV
-    # ---------------------------------------------------------
-    csv_folder = fileloc.downloaded_data_folder
-    idx2_path = os.path.join(csv_folder, f"INDEX_{idx2}.csv")
+    # ------------------------------------------------------------
+    # 3) Load BCB data (monthly) → forward-fill to IBOV daily timeline
+    # ------------------------------------------------------------
+    bcb_folder = fileloc.bacen_downloaded_data_folder
+    bcb_file = os.path.join(bcb_folder, "bcb", "BCB_IPCA_SELIC.csv")
 
-    if not os.path.exists(idx2_path):
-        raise RuntimeError(f"File not found: {idx2_path}")
+    if not os.path.exists(bcb_file):
+        raise FileNotFoundError(f"BCB file not found: {bcb_file}")
 
-    df2 = pd.read_csv(idx2_path, index_col=0, parse_dates=True)
+    df_bcb = pd.read_csv(bcb_file, index_col=0, parse_dates=True)
+    df_bcb.index = pd.to_datetime(df_bcb.index)
 
-    # align to idx1 dates
-    df2 = df2.loc[df_out.index]
+    # daily align SELIC
+    df_selic = selic_vs_index_df(df_bcb, df_idx1)
+    df_selic = df_selic[['SELIC']].reindex(timeline).ffill()
 
-    if "Adj Close" in df2.columns:
-        col2 = "Adj Close"
-    elif "Close" in df2.columns:
-        col2 = "Close"
-    else:
-        col2 = df2.select_dtypes("number").columns[0]
+    # daily align IPCA
+    df_ipca = ipca_vs_index_df(df_bcb, df_idx1)
+    df_ipca = df_ipca[['IPCA']].reindex(timeline).ffill()
 
-    df_out[f"{idx2}_Close"] = df2[col2]
+    # ------------------------------------------------------------
+    # 4) Merge all into one daily dataframe aligned to IBOV
+    # ------------------------------------------------------------
+    df = pd.concat([df_idx1, df_idx2, df_selic, df_ipca], axis=1)
 
-    # ---------------------------------------------------------
-    # 3) Load SELIC/IPCA
-    # ---------------------------------------------------------
-    bcb_path = os.path.join(csv_folder, "bcb", "BCB_IPCA_SELIC.csv")
+    # ensure no NA remains
+    #df = df.fillna(method="ffill").fillna(method="bfill")  # gives future warning
+    df = df.ffill().bfill()
 
-    if not os.path.exists(bcb_path):
-        raise RuntimeError(f"Missing BCB file: {bcb_path}")
+    # MUST be same length as lookback
+    assert len(df) == lookback, f"Final df length {len(df)} != lookback {lookback}"
 
-    df_bcb = pd.read_csv(bcb_path, index_col=0, parse_dates=True)
-
-    df_selic = selic_vs_index_df(df_bcb, df_out)
-    df_ipca = ipca_vs_index_df(df_bcb, df_out)
-
-    df_out["SELIC"] = df_selic["SELIC"]
-    df_out["IPCA"] = df_ipca["IPCA"]
-
-    # ---------------------------------------------------------
-    # 4) Return a single, clean dataframe
-    # ---------------------------------------------------------
-    return df_out
+    return df
