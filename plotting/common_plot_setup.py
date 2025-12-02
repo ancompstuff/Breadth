@@ -18,9 +18,9 @@ def prepare_plot_data(df_idx: pd.DataFrame, df_eod, config: Config) -> PlotSetup
     xlabel_separation = max(1, int(lookback_period / number_xlabels))
 
     # config.market_to_study is still a dict -> OK to iterate
-    first_market = next(iter(config.market_to_study.values()))
-    idx = first_market["idx_code"]
-    mkt = first_market["market"]
+    market_to_plot = next(iter(config.market_to_study.values()))
+    idx = market_to_plot["idx_code"]
+    mkt = market_to_plot["market"]
 
     # --------------------------------------------------
     # Count number of tickers in EOD data
@@ -42,17 +42,27 @@ def prepare_plot_data(df_idx: pd.DataFrame, df_eod, config: Config) -> PlotSetup
     ymax = df_slice['Adj Close'].max()
 
     # --------------------------------------------------
-    # Build x-axis labels (converted to continuous index)
+    # Keep datetime index for alignment
+    # --------------------------------------------------
+    price_data = df_slice[['Adj Close']].copy()
+
+    # --------------------------------------------------
+    # Create a numeric index for plotting (0, 1, 2, ...)
+    # --------------------------------------------------
+    plot_index = pd.RangeIndex(len(price_data))
+
+    # --------------------------------------------------
+    # Build x-axis labels: real dates as strings
     # --------------------------------------------------
     df_slice_indexed = df_slice.reset_index()
     date_labels = df_slice_indexed['Date'].dt.strftime("%d/%m/%y").tolist()
-    slice_to_plot = df_slice_indexed  #.drop(columns=['Date'])
+    #slice_to_plot = df_slice_indexed  #.drop(columns=['Date'])
 
     # --------------------------------------------------
-    # Tick spacing
+    # Tick spacing/positions on the numeric index
     # --------------------------------------------------
-    tick_positions = list(range(0, len(slice_to_plot), xlabel_separation))
-    last_pos = len(slice_to_plot) - 1
+    tick_positions = list(range(0, len(price_data), xlabel_separation))
+    last_pos = len(price_data) - 1
     if last_pos not in tick_positions:
         if tick_positions and (last_pos - tick_positions[-1] <= 5):
             tick_positions[-1] = last_pos
@@ -65,7 +75,8 @@ def prepare_plot_data(df_idx: pd.DataFrame, df_eod, config: Config) -> PlotSetup
     return PlotSetup(
         idx,
         mkt,
-        slice_to_plot,
+        price_data,
+        plot_index,
         lookback_period,
         num_tickers,
         sample_start,

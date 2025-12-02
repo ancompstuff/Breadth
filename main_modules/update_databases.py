@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 from core.constants import yahoo_market_details
+from main_modules.bcb_data import download_and_save_bcb
 
 
 # ======================================================================
@@ -22,7 +23,7 @@ def update_databases(config, fileloc):
         (index_df, components_df)  for the selected market_to_study_dict_values
     """
     # Location of all CSV files
-    csv_folder = fileloc.downloaded_data_folder
+    csv_folder = fileloc.yahoo_downloaded_data_folder
 
     market_to_study_dict = config.market_to_study  # p.ex: 1: {"market": "Brazil", "idx_code": "^BVSP", "codes_csv": "IBOV.csv"}
     market_key = next(iter(market_to_study_dict))  # p.ex: 1
@@ -186,12 +187,36 @@ def update_databases(config, fileloc):
     index_df = update_indexes()
     components_df = update_component_csvs()
 
+    # ----------------------------------------------------------
+    #   DOWNLOAD SELIC + IPCA FROM BCB FOR SAME DATE RANGE
+    # ----------------------------------------------------------
+    print("\n***************************************************************")
+    print("--------------- Updating SELIC / IPCA (BCB) data --------------")
+    print("***************************************************************\n")
+
+    # Convert YYYY-mm-dd → dd/mm/YYYY
+    def _to_ddmmyyyy(s):
+        if '/' in s:
+            return s  # already dd/mm/yyyy
+        yyyy, mm, dd = s.split('-')
+        return f"{dd}/{mm}/{yyyy}"
+
+    start_bcb = _to_ddmmyyyy(config.yf_start_date)
+    end_bcb   = _to_ddmmyyyy(config.yf_end_date)
+
+    # config.bcb_series was added to your Config class:
+    #  {"ipca":433, "selic":4390}
+    series_map = {
+        config.bcb_series["ipca"]: "IPCA",
+        config.bcb_series["selic"]: "SELIC"
+    }
+
+    download_and_save_bcb(
+        fileloc_downloaded_data_folder=fileloc.bacen_downloaded_data_folder,
+        start_date=start_bcb,
+        end_date=end_bcb,
+        series_map=series_map
+    )
+
     # --- RETURN BOTH ---
     return index_df, components_df
-
-
-
-
-
-
-

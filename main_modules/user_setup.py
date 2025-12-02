@@ -65,7 +65,7 @@ def get_objective_from_user() -> int:
         print(f"{k}: {v}")
 
     while True:
-        raw = input("Enter your choice. <Return> for Default (1): ").strip() or "5"  # "1" put back after testing
+        raw = input("Enter your choice. <Return> for Default (1): ").strip() or "1"  # "1" put back after testing
         try:
             choice = int(raw)
             if choice in objective_options:

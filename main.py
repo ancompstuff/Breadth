@@ -45,18 +45,29 @@ def main():
 
     # Close/Volume/OBV
     from indicators.close_vol_obv import compute_close_vol_obv
-    index_df = compute_close_vol_obv(index_df)
+    out_df = compute_close_vol_obv(index_df)
 
     ###################################
-    # 5) Plotting
+    # 5) PlotSetup creation
     ###################################
     from plotting.common_plot_setup import prepare_plot_data
     ps = prepare_plot_data(index_df, components_df, config)
 
+    ###################################
+    # 6) STANDARD PLOTS
+    ###################################
+
     # Close/Volume/OBV
     from plotting.close_vol_obv import plot_close_vol_obv
+    fig1 = plot_close_vol_obv(ps, out_df)
+    plt.show()
 
-    fig = plot_close_vol_obv(ps, index_df)
+    # IBOV vs USD + SELIC + IPCA
+    from plotting.plot_idx1_v_idx2 import plot_idx1_v_idx2
+    # Typically idx1 = IBOV and idx2 = USD/BRL
+    idx1 = "^BVSP"
+    idx2 = "BRL=X"
+    fig2 = plot_idx1_v_idx2(idx1, idx2, config, fileloc, ps)
     plt.show()
 
 

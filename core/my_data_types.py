@@ -1,7 +1,7 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import matplotlib.pyplot as plt
 import pandas as pd
-import json, os
+import json
 from pathlib import Path
 
 
@@ -10,7 +10,8 @@ from pathlib import Path
 #==========================================================================================
 @dataclass
 class FileLocations:
-    downloaded_data_folder: str
+    yahoo_downloaded_data_folder: str
+    bacen_downloaded_data_folder: str
     pdf_folder: str
     codes_to_download_folder: str
 
@@ -45,7 +46,8 @@ def load_file_locations(path: Path = None) -> FileLocations:
         return str((base / p).resolve())
 
     return FileLocations(
-        downloaded_data_folder=resolve_folder(data["downloaded_data_folder"]),
+        yahoo_downloaded_data_folder=resolve_folder(data["yahoo_downloaded_data_folder"]),
+        bacen_downloaded_data_folder=resolve_folder(data["bacen_downloaded_data_folder"]),
         pdf_folder=resolve_folder(data["pdf_folder"]),
         codes_to_download_folder=resolve_folder(data["codes_to_download_folder"]),
     )
@@ -71,6 +73,10 @@ class Config:
     download_end_date: str  # last date you want included in the download
     yf_end_date: str  # last_date_to_download +1 because yFinance doesn't include the last date
     study_end_date: str  # used when using custom studies or test
+    bcb_series: dict = field(default_factory=lambda: {
+        "ipca": 433,
+        "selic": 4390
+    })  # Using field, each new Config() gets its own fresh dictionary. Not important in this case. Could hard-code.
 
     def to_dict(self):
         """
@@ -114,7 +120,8 @@ class PlotSetup:
     """Container for all common plotting parameters."""
     idx: str
     mkt: str
-    slice_to_plot: pd.DataFrame
+    price_data: pd.DataFrame  # datetime indexed
+    plot_index: pd.Index  # numeric index for plotting: Range Index (0..N)
     lookback_period: int
     num_tickers: int
     sample_start: str
@@ -129,20 +136,25 @@ class PlotSetup:
         Apply common x-axis formatting (ticks, labels, rotation)
         to the provided Matplotlib axis.
         """
-        # 'Date' is a column, tick_positions are integer offsets
         ax.set_xticks(self.tick_positions)
         ax.set_xticklabels(
             [self.date_labels[i] for i in self.tick_positions],
-            rotation=45,
-            fontsize=8
+            rotation=45, fontsize=8
         )
 
     def plot_price_layer(self, ax):
         """Standard price plotting: black line + grey fill + y-limits."""
-        d = self.slice_to_plot
-        ax.plot(d.index, d["Adj Close"], color="black", linewidth=1.5, zorder=4)
-        ax.fill_between(d.index, d["Adj Close"], color="lightgrey")
+        # FIX: Use proper column access for datetime-indexed DataFrame
+        # adj = self.price_data.loc[:, "Adj Close"]
+        # or simpler:
+        adj = self.price_data['Adj Close'].values  # Extract as numpy array directly
+        ax.plot(self.plot_index, adj, color="black", linewidth=1.5, zorder=4, label="Preço")
+        ax.fill_between(self.plot_index, adj, color="lightgrey")
         ax.set_ylim(self.ymin, self.ymax)
+        ax.set_ylabel('Preço', color='black')
+        ax.tick_params(axis='y', labelsize=8)
+        # VERTICAL GRID (x-axis)
+        ax.grid(True, axis='x', linestyle='-', alpha=0.3, color='gray', linewidth=0.8)
 
 
 #==========================================================================================

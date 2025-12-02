@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
+from main_modules.bcb_data import download_and_save_bcb
 
 def create_databases(config, fileloc):
     """
@@ -18,18 +19,24 @@ def create_databases(config, fileloc):
         config.last_date_to_download
         config.yahoo_end_date
         fileloc.codes_to_download_folder
-        fileloc.downloaded_data_folder
+        fileloc.yahoo_downloaded_data_folder
     """
+    #
+    config.bcb_series = {
+        "ipca": 433,
+        "selic": 4390
+    }
+
     #Initialise empty dfs
     index_df = []
     components_df = []
     # ---------------------------------------------------------
     # 1) Prepare folders
     # ---------------------------------------------------------
-    os.makedirs(fileloc.downloaded_data_folder, exist_ok=True)
+    os.makedirs(fileloc.yahoo_downloaded_data_folder, exist_ok=True)
 
     print("\n📂 Creating new databases...")
-    print(f"Database folder: {fileloc.downloaded_data_folder}")
+    print(f"Database folder: {fileloc.yahoo_downloaded_data_folder}")
     print(f"Tickers folder:  {fileloc.codes_to_download_folder}")
     print("-" * 60)
 
@@ -60,7 +67,7 @@ def create_databases(config, fileloc):
             progress=False
         )
         idx_path = os.path.join(
-            fileloc.downloaded_data_folder,
+            fileloc.yahoo_downloaded_data_folder,
             f"INDEX_{idx_code}.csv"
         )
         print(f"Saved: {idx_path}")
@@ -102,7 +109,7 @@ def create_databases(config, fileloc):
         )
 
         comp_path = os.path.join(
-            fileloc.downloaded_data_folder,
+            fileloc.yahoo_downloaded_data_folder,
             f"EOD_{market_name}.csv"
         )
 
@@ -124,6 +131,37 @@ def create_databases(config, fileloc):
             ]
 
     print("\n✅ Database creation completed.")
+
+    # ----------------------------------------------------------
+    #   DOWNLOAD SELIC + IPCA FROM BCB FOR SAME DATE RANGE
+    # ----------------------------------------------------------
+    print("\n***************************************************************")
+    print("--------------- Downloading SELIC / IPCA (BCB) data ----------")
+    print("***************************************************************\n")
+
+    # Convert YYYY-mm-dd → dd/mm/YYYY
+    def _to_ddmmyyyy(s):
+        if '/' in s:
+            return s  # already dd/mm/yyyy
+        yyyy, mm, dd = s.split('-')
+        return f"{dd}/{mm}/{yyyy}"
+
+    start_bcb = _to_ddmmyyyy(config.yf.start_date)
+    end_bcb   = _to_ddmmyyyy(config.yf_end_date)
+
+    # config.bcb_series was added at the start of create_databases
+    series_map = {
+        config.bcb_series["ipca"]: "IPCA",
+        config.bcb_series["selic"]: "SELIC"
+    }
+
+    download_and_save_bcb(
+        fileloc_downloaded_data_folder=fileloc.bacen_downloaded_data_folder,
+        start_date=start_bcb,
+        end_date=end_bcb,
+        series_map=series_map
+    )
+
 
     return index_df, components_df
 
