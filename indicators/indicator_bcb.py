@@ -67,3 +67,5 @@ def selic_vs_index_df(df_bcb, df_ibov):
 
 def ipca_vs_index_df(df_bcb, df_ibov):
     return bcb_series_vs_index_df(df_bcb, df_ibov, "IPCA")
+
+# can add other codes here
