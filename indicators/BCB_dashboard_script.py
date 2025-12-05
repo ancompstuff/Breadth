@@ -244,22 +244,23 @@ df_m = df.resample("ME").last()
 df_m.to_csv(monthly_csv_path, index_label="date")
 print(f"Saved monthly data to: {monthly_csv_path}")
 
-# select just SELIC and IPCA monthly for the legacy pipeline (get_idx1_idx2)
-bcb_subset = df_m[["SELIC Policy Interest Rate (annualized, 252-day basis)", "IPCA"]].copy()
+# df_m: monthly DataFrame with all series, columns are SERIES labels
+# We need at least "Selic Diária" and "IPCA" for get_idx1_idx2/bcb_align
+bcb_subset_cols = [col for col in df_m.columns if col in ["Selic Diária", "IPCA"]]
+bcb_subset = df_m[bcb_subset_cols].copy()
 
-# rename to the short names expected by get_idx1_idx2
-bcb_subset = bcb_subset.rename(columns={
-    "SELIC Policy Interest Rate (annualized, 252-day basis)": "SELIC",
-    "IPCA": "IPCA",
-})
+# Save in the folder get_idx1_idx2 expects:
+# fileloc.bacen_downloaded_data_folder / "BCB_IPCA_SELIC.csv"
+from core.constants import file_locations
+from core.my_data_types import load_file_locations_dict
 
-# write to the location get_idx1_idx2 expects
-bcb_folder = OUT_DIR  # e.g. F:\...\bacen_data
-os.makedirs(os.path.join(bcb_folder, "bcb"), exist_ok=True)
-bcb_ipca_selic_path = os.path.join(bcb_folder, "bcb", "BCB_IPCA_SELIC.csv")
+fileloc = load_file_locations_dict(file_locations)
+bcb_folder = fileloc.bacen_downloaded_data_folder
 
+os.makedirs(bcb_folder, exist_ok=True)
+bcb_ipca_selic_path = os.path.join(bcb_folder, "BCB_IPCA_SELIC.csv")
 bcb_subset.to_csv(bcb_ipca_selic_path, index_label="date")
-print(f"Saved legacy SELIC+IPCA file to: {bcb_ipca_selic_path}")
+print(f"Saved BCB_IPCA_SELIC.csv to: {bcb_ipca_selic_path}")
 
 # -----------------------------
 # Plotting dashboard (multi-panel)

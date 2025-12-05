@@ -71,7 +71,7 @@ def get_idx1_idx2(idx1, idx2, config, fileloc, plot_setup):
 
     # daily align SELIC (using helper from bcb_align)
     df_selic = selic_vs_index_df(df_bcb, df_idx1)
-    df_selic = df_selic[['SELIC']].reindex(timeline).ffill()
+    df_selic = df_selic[['Selic Diária']].reindex(timeline).ffill()
 
     # daily align IPCA
     df_ipca = ipca_vs_index_df(df_bcb, df_idx1)
