@@ -61,9 +61,6 @@ def main():
     from indicators.close_vol_obv import compute_close_vol_obv
     out_df = compute_close_vol_obv(index_df)
 
-    from indicators.bcb_align import bcb_all_vs_ibov_normalized
-    df_bcb_norm_daily = bcb_all_vs_ibov_normalized(df_bcb, index_df)
-
     ###################################
     # 5) PlotSetup creation
     ###################################
@@ -79,25 +76,20 @@ def main():
     fig1 = plot_close_vol_obv(ps, out_df)
     plt.show()
 
-    # IBOV vs USD + SELIC + IPCA
+    # IBOV vs USD + SELIC + IPCA (uses get_idx1_idx2 → BCB_IPCA_SELIC.csv)
     from plotting.plot_idx1_v_idx2 import plot_idx1_v_idx2
-    # Typically idx1 = IBOV and idx2 = USD/BRL
     idx1 = "^BVSP"
     idx2 = "BRL=X"
     fig2 = plot_idx1_v_idx2(idx1, idx2, config, fileloc, ps)
     plt.show()
 
-    # BCB vs IBOV
-    from plotting.plot_bcb_vs_yahoo import plot_bcb_vs_yahoo
-    fig3, ax3 =plot_bcb_vs_yahoo(ps, df_bcb_norm_daily)
-
-    ################################################################
-    # 1) Load BCB monthly data (example: from CSV you already save)
-    ################################################################
+    ###################################
+    # 7) BCB vs IBOV (all BCB, normalized)
+    ###################################
     from indicators.bcb_align import bcb_all_vs_ibov_normalized
     from plotting.plot_bcb_vs_yahoo import plot_bcb_vs_yahoo
 
-
+    # 1) Load BCB monthly data produced by build_bcb_files
     bcb_monthly_path = os.path.join(fileloc.bacen_downloaded_data_folder, "bcb_dashboard_monthly.csv")
     df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
 
