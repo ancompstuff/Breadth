@@ -96,6 +96,9 @@ def main():
     # 2) Indicator: build normalized daily combined DataFrame
     df_bcb_norm_daily = bcb_all_vs_ibov_normalized(df_bcb, index_df)
 
+    # DEBUG: check normalization
+    print(f"Normalised OK: {df_bcb_norm_daily.iloc[[0, -1]].T}")
+
     # 3) Plot: BCB vs Yahoo, normalized
     fig3, ax3 = plot_bcb_vs_yahoo(ps, df_bcb_norm_daily)
     plt.show()

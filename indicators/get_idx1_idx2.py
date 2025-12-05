@@ -70,17 +70,19 @@ def get_idx1_idx2(idx1, idx2, config, fileloc, plot_setup):
     df_bcb.index = pd.to_datetime(df_bcb.index)
 
     # daily align SELIC (using helper from bcb_align)
-    df_selic = selic_vs_index_df(df_bcb, df_idx1)
-    df_selic = df_selic[['Selic Diária']].reindex(timeline).ffill()
+    df_selic = selic_vs_index_df(df_bcb, df_idx1)[['Selic Diária']]  # ['IBOV', 'Selic Diária']
+    df_selic = df_selic.reindex(timeline).ffill()
+    df_selic = df_selic.rename(columns={"Selic Diária": "SELIC"})
 
     # daily align IPCA
-    df_ipca = ipca_vs_index_df(df_bcb, df_idx1)
+    df_ipca = ipca_vs_index_df(df_bcb, df_idx1)  # ['IBOV', 'IPCA']
     df_ipca = df_ipca[['IPCA']].reindex(timeline).ffill()
 
     # ------------------------------------------------------------
     # 4) Merge all into one daily dataframe aligned to IBOV
     # ------------------------------------------------------------
     df = pd.concat([df_idx1, df_idx2, df_selic, df_ipca], axis=1)
+    # df.columns: ['IBOV', 'BRL=X', 'SELIC', 'IPCA']
 
     # ensure no NA remains
     #df = df.fillna(method="ffill").fillna(method="bfill")  # gives future warning

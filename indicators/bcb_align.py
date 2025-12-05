@@ -30,7 +30,8 @@ def forward_fill_bcb_to_daily(df_bcb, target_index):
 #   GENERIC BUILDER: any BCB column vs IBOV Adj Close
 # ------------------------------------------------------------------------
 
-def bcb_series_vs_index_df(df_bcb, df_ibov, column_name):
+def \
+        bcb_series_vs_index_df(df_bcb, df_ibov, column_name):
     """
     Builds a DataFrame with columns ['IBOV', column_name]
     aligned daily (IBOV) with forward-filled BCB (monthly).
