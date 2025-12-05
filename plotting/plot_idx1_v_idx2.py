@@ -107,8 +107,8 @@ def plot_idx1_v_idx2(idx1, idx2, config, fileloc, plot_setup):
     plot_setup.plot_price_layer(ax_selic)
 
     ax_selic_r = ax_selic.twinx()
-    ax_selic_r.plot(x, df[col_selic].values * 10, linewidth=1.2, color="tab:blue", label="SELIC (%)")
-    ax_selic_r.set_ylabel("SELIC (%)", color="tab:blue")
+    ax_selic_r.plot(x, df[col_selic].values, linewidth=1.2, color="tab:blue", label="SELIC (% mensal)")
+    ax_selic_r.set_ylabel("SELIC (% mensal)", color="tab:blue")
     ax_selic_r.tick_params(axis='y', labelcolor="tab:blue")
     #ax_selic_r.yaxis.set_major_formatter(percent_fmt)
     ax_selic_r.grid(True, axis='y', linestyle='--', alpha=0.4)
@@ -133,8 +133,8 @@ def plot_idx1_v_idx2(idx1, idx2, config, fileloc, plot_setup):
     plot_setup.plot_price_layer(ax_ipca)
 
     ax_ipca_r = ax_ipca.twinx()
-    ax_ipca_r.plot(x, df[col_ipca].values * 10, linewidth=1.2, color="tab:orange", label="IPCA (%)")
-    ax_ipca_r.set_ylabel("IPCA (%)", color="tab:orange")
+    ax_ipca_r.plot(x, df[col_ipca].values, linewidth=1.2, color="tab:orange", label="IPCA (% mensal)")
+    ax_ipca_r.set_ylabel("IPCA (% mensal)", color="tab:orange")
     ax_ipca_r.tick_params(axis='y', labelcolor="tab:orange")
     #ax_ipca_r.yaxis.set_major_formatter(percent_fmt)
     ax_ipca_r.grid(True, axis='y', linestyle='--', alpha=0.4)

@@ -1,6 +1,5 @@
 import pandas as pd
-import json
-from core.my_data_types import Config, FileLocations, load_file_locations
+
 
 #################################################################################################
 def align_and_prepare_for_plot(df1: pd.DataFrame, df2: pd.DataFrame, verbose: bool = True):

@@ -58,12 +58,57 @@ def bcb_series_vs_index_df(df_bcb, df_ibov, column_name):
     }, index=ibov.index)
 
 
+import pandas as pd
+
+# ... existing code ...
+
+def bcb_all_vs_ibov_normalized(df_bcb: pd.DataFrame, df_ibov: pd.DataFrame) -> pd.DataFrame:
+    """
+    DAILY DataFrame with:
+        - 'IBOV' (Adj Close of index)
+        - one column per BCB series in df_bcb
+    All series:
+        - reindexed to IBOV's daily calendar
+        - forward-filled (BCB monthly -> daily)
+        - normalized to 100 at their first non-NaN value
+    """
+    if df_bcb is None or df_ibov is None:
+        return None
+
+    ibov = _ensure_ibov_adjclose(df_ibov)
+    ibov.index = pd.to_datetime(ibov.index, errors='coerce')
+
+    # forward-fill all BCB columns onto IBOV calendar
+    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, ibov.index)
+    if df_bcb_daily is None:
+        return None
+
+    combined = df_bcb_daily.copy()
+    combined["IBOV"] = ibov["Adj Close"]
+
+    # normalise all columns to 100 at first non-NaN
+    df_norm = combined.copy()
+    for col in df_norm.columns:
+        series = df_norm[col].dropna()
+        if series.empty:
+            df_norm[col] = pd.NA
+            continue
+        base = series.iloc[0]
+        if base == 0 or pd.isna(base):
+            df_norm[col] = pd.NA
+        else:
+            df_norm[col] = (df_norm[col] / base) * 100.0
+
+    df_norm = df_norm.dropna(axis=1, how="all")
+    return df_norm
+
+
 # ------------------------------------------------------------------------
 #   SHORTCUTS (1-liners)
 # ------------------------------------------------------------------------
 
 def selic_vs_index_df(df_bcb, df_ibov):
-    return bcb_series_vs_index_df(df_bcb, df_ibov, "SELIC")
+    return bcb_series_vs_index_df(df_bcb, df_ibov, "Selic Diária")
 
 def ipca_vs_index_df(df_bcb, df_ibov):
     return bcb_series_vs_index_df(df_bcb, df_ibov, "IPCA")

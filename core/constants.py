@@ -1,3 +1,8 @@
+from pathlib import Path
+
+#--------------------------
+# YAHOO MARKET DETAILS
+# #--------------------------
 yahoo_market_details = {
         1: {'idx_code': '^BVSP', 'market': 'Bovespa', 'codes_csv': 'IBOV.csv'},
         2: {'idx_code': '^IXIC', 'market': 'NASDAQ', 'codes_csv': 'NASDAQ.csv'},
@@ -14,12 +19,61 @@ yahoo_market_details = {
         13: {'idx_code': '^BVSP', 'market': '3 ticker test', 'codes_csv': 'TEST.csv'},
         #14: {'idx_code': '^IGCX', 'market': 'iGov', 'codes_csv': 'IGCX.csv'}
 }
-file_locations = {
-        "downloaded_data_folder": "../Trading Data/Data_files_test",
-        "pdf_folder": "../Trading Data/Data_files_test/PDF_test",
-        "codes_to_download_folder": "../Trading Data/Modular_Codes_to_download",
-        "yahoo_markets_dictionary": "yahoo_market_details.json"
+
+# --------------------------
+# BCB SERIES (SGS codes)
+# --------------------------
+
+# master catalog: code → display name
+bcb_series_catalog = {
+    1: "BRL/USD Exchange Rate – End of period (commercial rate)",
+    3541: "International Reserves (US$ million)",
+    22600: "Current Account Balance (US$ million, monthly)",
+    20635: "Total Credit Operations of the National Financial System – Outstanding balance",
+    27821: "Broad Money / Monetary Aggregate M4 (stock, overall liquidity in the economy)",
+    433: "IPCA",
+    422: "Central Bank Base Rate in annual terms",
+    1178: "SELIC Policy Interest Rate (annualized, 252-day basis)",
+    11: "Selic Diária",
+    256: "Taxa Juros Longo Prazo",
+    24363: "IBC-Br – CB Economic Activity Index (seasonally adjusted, proxy for GDP)",
+    27574: "Índice de Commodities - (IC-Br)",
+    27575: "IC-Br - Agropecuária",
+    27577: "IC-Br - Energia",
+    27576: "IC-Br - Metal",
+    4390: "Selic Acumulada no mes",
+    4468: "Net Public Debt (Govt+BC)",
+    4500: "Net Public Sector Debt (% of GDP)",
+    13762: "Gross General Government Debt (% of GDP)"
 }
+
+# which series are actually downloaded / maintained in the main BCB DB
+# (easy to change without touching code)
+bcb_default_series = {
+    433:  "IPCA",
+    4390: "SELIC",
+}
+
+
+#--------------------------
+# DATA FILE LOCATIONS
+#--------------------------
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+file_locations = {
+    "yahoo_downloaded_data_folder": PROJECT_ROOT / "TradingData" / "Data_files" / "yahoo_data",
+    "bacen_downloaded_data_folder": PROJECT_ROOT / "TradingData" / "Data_files" / "bacen_data",
+    "pdf_folder": PROJECT_ROOT / "TradingData" / "PDF",
+    "codes_to_download_folder": PROJECT_ROOT / "TradingData" / "Codes_to_download",
+}
+print("PROJECT_ROOT =", PROJECT_ROOT)
+print("YAHOO =", file_locations["yahoo_downloaded_data_folder"])
+print("EXISTS =", file_locations["yahoo_downloaded_data_folder"].exists())
+
+
+#--------------------------
+# Dictionaries
+#--------------------------
 
 ma_groups = {
         "short": {"periods": [5, 12, 25],

@@ -2,9 +2,8 @@ import os
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
-from core.constants import yahoo_market_details
-from main_modules.bcb_data import download_and_save_bcb
-
+from core.constants import yahoo_market_details, bcb_series_catalog, bcb_default_series
+from main_modules.bcb_data import create_or_update_bcb_database
 
 # ======================================================================
 #   UPDATE INDEX + COMPONENTS USING NEW CONFIG + FILELOC STRUCTURE
@@ -76,7 +75,8 @@ def update_databases(config, fileloc):
                                            end=last_yahoo_date_to_download,
                                            progress=False,  # show progress bar
                                            rounding=True,
-                                           auto_adjust=True
+                                           auto_adjust=False,
+                                           multi_level_index=False
                                            )
 
                     if not new_data.empty:
@@ -150,7 +150,7 @@ def update_databases(config, fileloc):
                                           group_by="ticker",
                                           progress=False,
                                           rounding=True,
-                                          auto_adjust=True,
+                                          auto_adjust=False,
                                           actions=True)
 
                     if comp_new_data.empty:
@@ -187,7 +187,7 @@ def update_databases(config, fileloc):
     index_df = update_indexes()
     components_df = update_component_csvs()
 
-    # ----------------------------------------------------------
+    """# ----------------------------------------------------------
     #   DOWNLOAD SELIC + IPCA FROM BCB FOR SAME DATE RANGE
     # ----------------------------------------------------------
     print("\n***************************************************************")
@@ -211,12 +211,43 @@ def update_databases(config, fileloc):
         config.bcb_series["selic"]: "SELIC"
     }
 
-    download_and_save_bcb(
-        fileloc_downloaded_data_folder=fileloc.bacen_downloaded_data_folder,
-        start_date=start_bcb,
-        end_date=end_bcb,
-        series_map=series_map
-    )
+    create_or_update_bcb_database(
+        fileloc_bacen_downloaded_data_folder=fileloc.bacen_downloaded_data_folder,
+        yf_start_date=config.yf_start_date,
+        yf_end_date=config.yf_end_date,
+        series_map=bcb_series_catalog,  #sbcb_default_series,  # or another series_map if you want more series
+        filename="BCB_IPCA_SELIC.csv",
+        use_subfolder=False
+    )"""
+
+    # --- Ensure 'Adj Close' exists in returned dataframes ---
+    def _ensure_adj_close_index(df):
+        if df is None:
+            return df
+        # Single-level columns: create 'Adj Close' from 'Close' if missing
+        if "Adj Close" not in df.columns and "Close" in df.columns:
+            df["Adj Close"] = df["Close"]
+        return df
+
+    def _ensure_adj_close_components(df):
+        if df is None:
+            return df
+        # MultiIndex columns (first level = field, second level = ticker)
+        if isinstance(df.columns, pd.MultiIndex):
+            fields = df.columns.get_level_values(0).unique()
+            tickers = df.columns.get_level_values(1).unique()
+            for t in tickers:
+                if ("Adj Close", t) not in df.columns and ("Close", t) in df.columns:
+                    df[("Adj Close", t)] = df[("Close", t)]
+            # sort columns for consistent order
+            df = df.sort_index(axis=1)
+        else:
+            if "Adj Close" not in df.columns and "Close" in df.columns:
+                df["Adj Close"] = df["Close"]
+        return df
+
+    index_df = _ensure_adj_close_index(index_df)
+    components_df = _ensure_adj_close_components(components_df)
 
     # --- RETURN BOTH ---
     return index_df, components_df

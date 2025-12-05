@@ -2,8 +2,8 @@ import json
 import os
 import pandas as pd
 from datetime import datetime, timedelta
-from core.my_data_types import Config, FileLocations, load_file_locations
-from core.constants import yahoo_market_details
+from core.my_data_types import Config, FileLocations, load_file_locations_dict
+from core.constants import yahoo_market_details, file_locations
 
 
 # ====================== HELPER FUNCTION TO COUNT THE TICKERS IN THE CSV =============================#
@@ -30,7 +30,7 @@ def what_do_you_want_to_do():
 #######################################################################################################
 
 
-    fileloc = load_file_locations()
+    fileloc = load_file_locations_dict(file_locations)
 
     hoje = datetime.now()
     reference_time = 18

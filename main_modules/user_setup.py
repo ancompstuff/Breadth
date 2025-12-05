@@ -9,7 +9,7 @@ or
 Notes
 -----
 - Expects the following to exist and be importable:
-    from core.my_data_types import Config, FileLocations, load_file_locations
+    from core.my_data_types import Config, FileLocations, load_file_locations_dict
     from core.constants import yahoo_market_details
 
 - Expects utils:
@@ -21,8 +21,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, Tuple
 
-from core.my_data_types import Config, FileLocations, load_file_locations
-from core.constants import yahoo_market_details
+from core.my_data_types import Config, FileLocations, load_file_locations_dict
+from core.constants import yahoo_market_details, file_locations
+
 
 # utils
 from utils.attach_num_tickers import attach_number_tickers
@@ -185,7 +186,7 @@ def build_option_1_defaults(reference_time: int) -> dict:
     end_date = _today_or_yesterday_if_before_hour(reference_time)
 
     return {
-        "objective": 1,
+        "to_do": 1,
         "market_to_study": market_to_study,
         "to_update": market_to_study,
         "graph_lookback": 252,
@@ -204,7 +205,7 @@ def build_option_2_update_all(reference_time: int) -> dict:
     chosen_lookback = how_far_to_lookback()
 
     return {
-        "objective": 2,
+        "to_do": 2,
         "market_to_study": market_to_study,
         "to_update": markets,
         "graph_lookback": chosen_lookback,
@@ -254,7 +255,7 @@ def build_option_3_custom(fileloc: FileLocations, reference_time: int) -> dict:
     end_date = _today_or_yesterday_if_before_hour(reference_time)
 
     return {
-        "objective": 3,
+        "to_do": 3,
         "market_to_study": market_to_study,
         "to_update": to_update,
         "graph_lookback": chosen_lookback,
@@ -289,7 +290,7 @@ def build_option_4_build_databases(fileloc: FileLocations,  reference_time: int)
     end_date = get_update_date(reference_time)
 
     return {
-        "objective": 4,
+        "to_do": 4,
         "market_to_study": market_to_study,
         "to_update": to_update,
         "graph_lookback": chosen_lookback,
@@ -344,7 +345,7 @@ def build_option_5_test(reference_time: int) -> dict:
         chosen_lookback = how_far_to_lookback()"""
 
     """return {
-        "objective": 5,
+        "to_do": 5,
         "market_to_study": market_to_study,
         "to_update": market_to_study,
         "graph_lookback": chosen_lookback,
@@ -354,7 +355,7 @@ def build_option_5_test(reference_time: int) -> dict:
         "study_end_date": study_end_date
     }"""
     return {
-            "objective": 5,
+            "to_do": 5,
             "market_to_study": {13: yahoo_market_details[13]},
             "to_update": {13: yahoo_market_details[13]},
             "graph_lookback": 252,
@@ -363,7 +364,6 @@ def build_option_5_test(reference_time: int) -> dict:
             #"yf_end_date": end_date,
             "study_end_date": _today_or_yesterday_if_before_hour(reference_time)
         }
-
 
 
 # ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ def assemble_config_object(params: dict) -> Config:
         yahoo_end_date = (end_date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
 
     cfg = Config(
-        to_do=params["objective"],
+        to_do=params["to_do"],
         market_to_study=params["market_to_study"],
         to_update=params.get("to_update"),
         graph_lookback=params.get("graph_lookback"),
@@ -397,7 +397,7 @@ def what_do_you_want_to_do(fileloc) -> Config:
     """
     Main interactive entry point. Builds and returns a Config object.
     """
-    #fileloc = load_file_locations()
+    #fileloc = load_file_locations_dict(file_locations)()
     hoje = datetime.now()
     reference_time = 18  # local market close hour used to decide 'today' vs 'yesterday'
 
@@ -430,7 +430,7 @@ def what_do_you_want_to_do(fileloc) -> Config:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    fileloc = load_file_locations()
+    fileloc = load_file_locations_dict(file_locations)
     cfg = what_do_you_want_to_do(fileloc)
     print("The Config object looks like this:")
     print(cfg)

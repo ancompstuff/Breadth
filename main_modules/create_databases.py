@@ -2,7 +2,10 @@ import os
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
-from main_modules.bcb_data import download_and_save_bcb
+from main_modules.bcb_data import create_or_update_bcb_database
+from core.constants import file_locations, yahoo_market_details, bcb_default_series, bcb_series_catalog
+import time
+from pathlib import Path
 
 def create_databases(config, fileloc):
     """
@@ -43,15 +46,15 @@ def create_databases(config, fileloc):
     # ---------------------------------------------------------
     # 2) Iterate over all markets that must be created
     # ---------------------------------------------------------
-    for key, info in config.to_update.items():
+    for key, info in yahoo_market_details.items():
 
-        market_name = info["market"]
         idx_code = info["idx_code"]
-        csv_file = info["codes_csv"]
-        number_tickers = info["number_tickers"]
+        market = info["market"]
+        #codes_csv_file = info["codes_csv"]
+        ##number_tickers = info["number_tickers"]
 
-        print(f"\n=== Building {market_name} ({idx_code}) ===")
-        print(f"Tickers: {number_tickers}")
+        print(f"\n=== Building {market} ({idx_code}) ===")
+        #print(f"Tickers: {number_tickers}")
 
         # -----------------------------------------------------
         # 3) Download INDEX data
@@ -64,13 +67,17 @@ def create_databases(config, fileloc):
             end=config.yf_end_date,
             rounding=True,
             auto_adjust=False,  # True: no Adj Close, OHLC adjusted automatically.
-            progress=False
+            progress=False,
+            multi_level_index=False
         )
+        #print(f"idx_data.dtypes: {idx_data.dtypes}")
+
         idx_path = os.path.join(
             fileloc.yahoo_downloaded_data_folder,
             f"INDEX_{idx_code}.csv"
         )
-        print(f"Saved: {idx_path}")
+        idx_data.to_csv(idx_path, index=True)
+        print(f"Index data saved to: {idx_path}")
 
         # If this is the market being studied → reload after update
         market_info = next(iter(config.market_to_study.values()))  # Get the first (and only) market info
@@ -79,13 +86,19 @@ def create_databases(config, fileloc):
             index_df.index = pd.to_datetime(index_df.index, errors="coerce")
             index_df = index_df[~index_df.index.duplicated(keep="first")]
 
-        # -----------------------------------------------------
-        # 4) Load tickers
-        # -----------------------------------------------------
+    # -----------------------------------------------------
+    # 4) Load tickers
+    # -----------------------------------------------------
+    for key, info in config.to_update.items():
+        market = info["market"]
+        #idx_code = info["idx_code"]
+        codes_csv_file = info["codes_csv"]
+        #number_tickers = info["number_tickers"]
+
         # CSV containing the component tickers
         tickers_csv_path = os.path.join(
             fileloc.codes_to_download_folder,
-            csv_file
+            codes_csv_file
         )
         if not os.path.exists(tickers_csv_path):
             print(f"❌ Missing CSV: {tickers_csv_path}")
@@ -110,13 +123,14 @@ def create_databases(config, fileloc):
 
         comp_path = os.path.join(
             fileloc.yahoo_downloaded_data_folder,
-            f"EOD_{market_name}.csv"
+            f"EOD_{market}.csv"
         )
 
         comp_data.to_csv(comp_path)
         print(f"Saved: {comp_path}")
 
-        if market_name == market_info['market']:
+        market_info = next(iter(config.market_to_study.values()))  # Get the first (and only) market info
+        if market == market_info['market']:
             components_df = pd.read_csv(comp_path,
                                        index_col=0,
                                        header=[0, 1],
@@ -132,50 +146,33 @@ def create_databases(config, fileloc):
 
     print("\n✅ Database creation completed.")
 
-    # ----------------------------------------------------------
-    #   DOWNLOAD SELIC + IPCA FROM BCB FOR SAME DATE RANGE
+    """# ----------------------------------------------------------
+    #   DOWNLOAD / UPDATE BCB DATA FOR SAME DATE RANGE
     # ----------------------------------------------------------
     print("\n***************************************************************")
-    print("--------------- Downloading SELIC / IPCA (BCB) data ----------")
+    print("--------------- Downloading BCB (IPCA / SELIC / others) -------")
     print("***************************************************************\n")
 
-    # Convert YYYY-mm-dd → dd/mm/YYYY
-    def _to_ddmmyyyy(s):
-        if '/' in s:
-            return s  # already dd/mm/yyyy
-        yyyy, mm, dd = s.split('-')
-        return f"{dd}/{mm}/{yyyy}"
-
-    start_bcb = _to_ddmmyyyy(config.yf_start_date)
-    end_bcb   = _to_ddmmyyyy(config.yf_end_date)
-
-    # config.bcb_series was added at the start of create_databases
-    series_map = {
-        config.bcb_series["ipca"]: "IPCA",
-        config.bcb_series["selic"]: "SELIC"
-    }
-
-    download_and_save_bcb(
-        fileloc_downloaded_data_folder=fileloc.bacen_downloaded_data_folder,
-        start_date=start_bcb,
-        end_date=end_bcb,
-        series_map=series_map
+    # Here we just call the BCB DB function with same dates as Yahoo:
+    create_or_update_bcb_database(
+        fileloc_bacen_downloaded_data_folder=fileloc.bacen_downloaded_data_folder,
+        yf_start_date=config.yf_start_date,
+        yf_end_date=config.yf_end_date,
+        series_map=bcb_series_catalog,  # bcb_default_series,  # or any other dict if you want more series
+        filename="BCB_IPCA_SELIC.csv",  # keep same for compatibility
+        use_subfolder=False  # or True if you prefer bacen_data/bcb/
     )
-
-
+"""
     return index_df, components_df
-
-
-###################################
+##################################################################################################
 # Main for testing
-###################################
+##################################################################################################
 
 if __name__ == "__main__":
     from pathlib import Path
-    from core.my_data_types import load_file_locations, Config, FileLocations
+    from core.my_data_types import load_file_locations_dict, Config, FileLocations
 
-    absolute_json_path = r"F:\Documents\PyCharmProjects\GitHub\Structured_Breadth\core\file_locations.json"
-    fileloc = load_file_locations(absolute_json_path)
+    fileloc = load_file_locations_dict(file_locations)
 
     cfg = Config(
         to_do=5,

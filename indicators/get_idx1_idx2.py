@@ -61,7 +61,7 @@ def get_idx1_idx2(idx1, idx2, config, fileloc, plot_setup):
     # 3) Load BCB data (monthly) → forward-fill to IBOV daily timeline
     # ------------------------------------------------------------
     bcb_folder = fileloc.bacen_downloaded_data_folder
-    bcb_file = os.path.join(bcb_folder, "bcb", "BCB_IPCA_SELIC.csv")
+    bcb_file = os.path.join(bcb_folder, "BCB_IPCA_SELIC.csv")
 
     if not os.path.exists(bcb_file):
         raise FileNotFoundError(f"BCB file not found: {bcb_file}")
@@ -69,7 +69,7 @@ def get_idx1_idx2(idx1, idx2, config, fileloc, plot_setup):
     df_bcb = pd.read_csv(bcb_file, index_col=0, parse_dates=True)
     df_bcb.index = pd.to_datetime(df_bcb.index)
 
-    # daily align SELIC
+    # daily align SELIC (using helper from bcb_align)
     df_selic = selic_vs_index_df(df_bcb, df_idx1)
     df_selic = df_selic[['SELIC']].reindex(timeline).ffill()
 

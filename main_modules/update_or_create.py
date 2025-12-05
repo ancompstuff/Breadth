@@ -2,7 +2,7 @@ from main_modules.create_databases import create_databases
 from main_modules.update_databases import update_databases
 
 """# Imports for testing. Delete after
-from core.my_data_types import load_file_locations, Config, FileLocations
+from core.my_data_types import load_file_locations_dict, Config, FileLocations
 from datetime import datetime"""
 
 def update_or_create_databases(config, fileloc):

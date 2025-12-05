@@ -1,8 +1,7 @@
 from dataclasses import dataclass, asdict, field
 import matplotlib.pyplot as plt
 import pandas as pd
-import json
-from pathlib import Path
+from core.constants import file_locations
 
 
 #==========================================================================================
@@ -15,41 +14,17 @@ class FileLocations:
     pdf_folder: str
     codes_to_download_folder: str
 
-def load_file_locations(path: Path = None) -> FileLocations:
+def load_file_locations_dict(d: dict) -> FileLocations:
+
     """
-    Load file_locations.json into FileLocations dataclass.
-    - If no path is given, look for file_locations.json in the same directory as this file (core).
-    - If a path is given, resolve it absolutely.
-    - All folder paths inside the JSON are resolved absolutely relative to the JSON file's location.
+    Load file_locations dict from core.constants into FileLocations dataclass.
     """
-    if path is None:
-        # Use config relative to this source file location
-        here = Path(__file__).resolve().parent
-        json_path = here / "file_locations.json"
-    else:
-        json_path = Path(path).resolve()  # absolute path to JSON config
-
-    if not json_path.exists():
-        raise FileNotFoundError(f"file_locations.json not found at {json_path}")
-
-    # Load JSON data
-    with json_path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Base path for relative folder paths inside JSON file
-    base = json_path.parent
-
-    def resolve_folder(p: str) -> str:
-        """Resolve folder path absolutely relative to JSON location."""
-        if not p:
-            return p
-        return str((base / p).resolve())
 
     return FileLocations(
-        yahoo_downloaded_data_folder=resolve_folder(data["yahoo_downloaded_data_folder"]),
-        bacen_downloaded_data_folder=resolve_folder(data["bacen_downloaded_data_folder"]),
-        pdf_folder=resolve_folder(data["pdf_folder"]),
-        codes_to_download_folder=resolve_folder(data["codes_to_download_folder"]),
+        yahoo_downloaded_data_folder=d["yahoo_downloaded_data_folder"],
+        bacen_downloaded_data_folder=d["bacen_downloaded_data_folder"],
+        pdf_folder=d["pdf_folder"],
+        codes_to_download_folder=d["codes_to_download_folder"],
     )
 
 
@@ -73,10 +48,10 @@ class Config:
     download_end_date: str  # last date you want included in the download
     yf_end_date: str  # last_date_to_download +1 because yFinance doesn't include the last date
     study_end_date: str  # used when using custom studies or test
-    bcb_series: dict = field(default_factory=lambda: {
-        "ipca": 433,
-        "selic": 4390
-    })  # Using field, each new Config() gets its own fresh dictionary. Not important in this case. Could hard-code.
+    #bcb_series: dict = field(default_factory=lambda: {
+    #    "ipca": 433,
+    #    "selic": 4390
+    #})  # Using field, each new Config() gets its own fresh dictionary. Not important in this case. Could hard-code.
 
     def to_dict(self):
         """
