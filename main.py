@@ -122,9 +122,10 @@ def main():
     # 3) Plot grid: each subplot = IBOV vs one BCB series (raw)
     figs = plot_bcb_grid(ps, df_bcb_daily, nrows=2, ncols=3)
 
-    # 4) Show all figures
+    """# 4) Show all figures
     for fig in figs:
-        fig.show()
+        fig.show()"""
+    plt.show()
 
 
 
