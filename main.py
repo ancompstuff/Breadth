@@ -84,23 +84,23 @@ def main():
     plt.show()
 
     ###################################
-    # 7) BCB vs IBOV (all BCB, normalized)
+    # 7) BCB vs IBOV (BCB normalized at sample start)
     ###################################
-    from indicators.bcb_align import bcb_all_vs_ibov_normalized
+    from indicators.bcb_align import forward_fill_bcb_to_daily
     from plotting.plot_bcb_vs_yahoo import plot_bcb_vs_yahoo
 
     # 1) Load BCB monthly data produced by build_bcb_files
-    bcb_monthly_path = os.path.join(fileloc.bacen_downloaded_data_folder, "bcb_dashboard_monthly.csv")
+    bcb_monthly_path = os.path.join(
+        fileloc.bacen_downloaded_data_folder,
+        "bcb_dashboard_monthly.csv",
+    )
     df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
 
-    # 2) Indicator: build normalized daily combined DataFrame
-    df_bcb_norm_daily = bcb_all_vs_ibov_normalized(df_bcb, index_df)
+    # 2) Make DAILY BCB data on the IBOV calendar
+    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, index_df.index)
 
-    # DEBUG: check normalization
-    print(f"Normalised OK: {df_bcb_norm_daily.iloc[[0, -1]].T}")
-
-    # 3) Plot: BCB vs Yahoo, normalized
-    fig3, ax3 = plot_bcb_vs_yahoo(ps, df_bcb_norm_daily)
+    # 3) Plot: IBOV Adj Close (left) vs BCB normalized at sample start (right)
+    fig3, (ax3_left, ax3_right) = plot_bcb_vs_yahoo(ps, df_bcb_daily)
     plt.show()
 
 

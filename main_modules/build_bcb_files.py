@@ -18,7 +18,7 @@ SERIES = {
     3546: "International Reserves Total (US$ million, monthly )",
     22701: "Current Account - monthly - net (US$ million)",
     23079: "Current account accumulated in 12 months in relation to GDP - monthly (%)",
-    29581: "Percentage of the highest risk balance of the credit portfolio – Non-financial corporations – Total",
+    #29581: "Percentage of the highest risk balance of the credit portfolio – Non-financial corporations – Total",
     27815: "Broad money supply - M4 (end-of-period balance)",
     433: "IPCA",
     1178: "SELIC Policy Interest Rate (annualized, 252-day basis)",
