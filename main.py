@@ -83,7 +83,7 @@ def main():
     fig2 = plot_idx1_v_idx2(idx1, idx2, config, fileloc, ps)
     plt.show()
 
-    ###################################
+    """###################################
     # 7) BCB vs IBOV (BCB normalized at sample start)
     ###################################
     from indicators.bcb_align import forward_fill_bcb_to_daily
@@ -101,7 +101,30 @@ def main():
 
     # 3) Plot: IBOV Adj Close (left) vs BCB normalized at sample start (right)
     fig3, (ax3_left, ax3_right) = plot_bcb_vs_yahoo(ps, df_bcb_daily)
-    plt.show()
+    plt.show()"""
+
+    ###################################
+    # 7) BCB vs IBOV – grid of single‑BCB charts
+    ###################################
+    from indicators.bcb_align import forward_fill_bcb_to_daily
+    from plotting.plot_bcb_vs_yahoo import plot_bcb_grid
+
+    # 1) Load BCB monthly data produced by build_bcb_files
+    bcb_monthly_path = os.path.join(
+        fileloc.bacen_downloaded_data_folder,
+        "bcb_dashboard_monthly.csv",
+    )
+    df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
+
+    # 2) Make DAILY BCB data on the IBOV calendar
+    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, index_df.index)
+
+    # 3) Plot grid: each subplot = IBOV vs one BCB series (raw)
+    figs = plot_bcb_grid(ps, df_bcb_daily, nrows=2, ncols=3)
+
+    # 4) Show all figures
+    for fig in figs:
+        fig.show()
 
 
 
