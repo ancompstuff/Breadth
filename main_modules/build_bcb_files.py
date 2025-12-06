@@ -1,6 +1,6 @@
 import requests
 import pandas as pd
-from datetime import date
+from datetime import date, timedelta
 from io import StringIO
 import os
 
@@ -156,12 +156,50 @@ def build_bcb_files(fileloc):
     OUT_DIR = fileloc.bacen_downloaded_data_folder
     os.makedirs(OUT_DIR, exist_ok=True)
 
+    raw_csv_path = os.path.join(OUT_DIR, "bcb_dashboard_raw.csv")
+
+    # ------------------------------------
+    # 0) Load existing raw data if present
+    # ------------------------------------
+    existing_df = None
+    last_date_global = None
+
+    if os.path.exists(raw_csv_path):
+        existing_df = pd.read_csv(raw_csv_path, index_col="date", parse_dates=True)
+        if not existing_df.empty:
+            last_date_global = existing_df.index.max().date()
+
+    # Decide dynamic START_DATE for this run
+    if last_date_global is not None:
+        dynamic_start = last_date_global + timedelta(days=1)
+    else:
+        dynamic_start = START_DATE
+
+    print(f"BCB download start date for this run: {dynamic_start} (end = {END_DATE})")
+
+    # -----------------------------
     # Download all series
+    # -----------------------------
     all_series = {}
+
     for code, label in SERIES.items():
         print(f"Downloading {code} - {label} ...")
-        s = fetch_sgs_series(code, START_DATE, END_DATE)
-        all_series[label] = s
+        s_new = fetch_sgs_series(code, start=dynamic_start, end=END_DATE)
+
+        if existing_df is not None and label in existing_df.columns:
+            s_old = existing_df[label]
+
+            if s_new is None or s_new.empty:
+                s_merged = s_old
+            else:
+                s_merged = (
+                    pd.concat([s_old, s_new])
+                      .sort_index()
+                      .drop_duplicates()
+                )
+            all_series[label] = s_merged
+        else:
+            all_series[label] = s_new
 
     # Align into one DataFrame
     df = pd.concat(all_series.values(), axis=1, join="outer")
@@ -174,7 +212,6 @@ def build_bcb_files(fileloc):
     print("Head:\n", df.head())
 
     # Save raw
-    raw_csv_path = os.path.join(OUT_DIR, "bcb_dashboard_raw.csv")
     df.to_csv(raw_csv_path, index_label="date")
     print(f"Saved raw data to: {raw_csv_path}")
 
