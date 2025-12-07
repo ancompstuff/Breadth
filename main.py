@@ -1,5 +1,6 @@
 # IMPORT FUNCTIONS
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import os
 from dataclasses import replace
@@ -91,40 +92,60 @@ def main():
     fig2 = plot_idx1_v_idx2(idx1, idx2, config, fileloc, ps)
     plt.show()
 
-
     ###################################
-    # 7) BCB vs IBOV – grid of single‑BCB charts
+    # 7) BCB vs IBOV – grid of single-BCB charts
     ###################################
     from indicators.bcb_align import forward_fill_bcb_to_daily
     from indicators.get_idx1_idx2 import get_idx1_idx2
-    from plotting.plot_bcb_vs_yahoo import plot_bcb_grid
+    from plotting.plot_bcb_grid import plot_bcb_grid
 
-    # 7.1) Load BCB monthly data produced by build_bcb_files
+    # 7.1) Load BCB monthly data
     bcb_monthly_path = os.path.join(
         fileloc.bacen_downloaded_data_folder,
         "bcb_dashboard_monthly.csv",
     )
     df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
 
-    # 7.2) Make DAILY BCB data on the IBOV calendar. Use long index from ps_bcb
+    # 7.2) Convert BCB data to DAILY using IBOV calendar (ps_bcb)
     df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, ps_bcb.price_data.index)
 
-    # 7.3) Get daily IBOV + USD via same logic as plot_idx1_v_idx2 but with longer PlotSetup
+    # 7.3) IBOV + USD with doubled lookback (config_bcb)
     idx1 = "^BVSP"
     idx2 = "BRL=X"
-    df_idx_usd_bcb = get_idx1_idx2(idx1, idx2, config, fileloc, ps_bcb)
+    df_idx_usd_bcb = get_idx1_idx2(idx1, idx2, config_bcb, fileloc, ps_bcb)
     df_idx_usd_bcb.index = pd.to_datetime(df_idx_usd_bcb.index)
 
-    # Align USD to the PlotSetup price_data dates
-    usd_series_bcb = df_idx_usd_bcb[idx2].reindex(ps_bcb.price_data.index)
+    # USD aligned to ps_bcb price index
+    src = df_idx_usd_bcb[idx2].sort_index()
+    tgt = ps_bcb.price_data.index
 
-    # 4) Plot grid: ps + daily BCB + smooth USD using longer PlotSetup
-    figs = plot_bcb_grid(ps_bcb,
-                         df_bcb_daily,
-                         usd_series=usd_series_bcb,
-                         nrows=3, ncols=2)
+    # First pass: reindex + ffill
+    usd_series_bcb = src.reindex(tgt).ffill()
+
+    # If still contains NaNs (rare), use merge_asof
+    if usd_series_bcb.isna().any():
+        left = pd.DataFrame({"t": tgt})
+        right = src.reset_index().rename(columns={"index": "t", idx2: "val"})
+        merged = pd.merge_asof(
+            left.sort_values("t"),
+            right.sort_values("t"),
+            on="t",
+            direction="backward"
+        )
+        usd_series_bcb = pd.Series(merged["val"].values, index=tgt).ffill()
+
+    # 7.4) Plot grid
+    figs = plot_bcb_grid(
+        ps_bcb,
+        df_bcb_daily,
+        usd_series=usd_series_bcb,
+        nrows=3,
+        ncols=2,
+    )
+
     for fig in figs:
         fig.show()
+
     plt.show()
 
 
