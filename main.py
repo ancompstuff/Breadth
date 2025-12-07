@@ -66,13 +66,14 @@ def main():
     # 5) PlotSetup creation
     ###################################
     from plotting.common_plot_setup import prepare_plot_data
+
+    # 1) Normal PlotSetup
     ps = prepare_plot_data(index_df, components_df, config)
     #print("price_data columns:", ps.price_data.columns.tolist())
 
-    # Make a copy of config with doubled lookback for BCB plots
-    config_long = replace(config, graph_lookback=config.graph_lookback * 2)
-    # Second PlotSetup with 2× window
-    ps_bcb = prepare_plot_data(index_df, components_df, config_long)
+    ## 2) BCB PlotSetup with 2× lookback
+    config_bcb = replace(config, graph_lookback=config.graph_lookback * 2)
+    ps_bcb = prepare_plot_data(index_df, components_df, config_bcb)
 
     ###################################
     # 6) STANDARD PLOTS
@@ -98,34 +99,33 @@ def main():
     from indicators.get_idx1_idx2 import get_idx1_idx2
     from plotting.plot_bcb_vs_yahoo import plot_bcb_grid
 
-    # 1) Load BCB monthly data produced by build_bcb_files
+    # 7.1) Load BCB monthly data produced by build_bcb_files
     bcb_monthly_path = os.path.join(
         fileloc.bacen_downloaded_data_folder,
         "bcb_dashboard_monthly.csv",
     )
     df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
 
-    # 2) Make DAILY BCB data on the IBOV calendar
-    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, index_df.index)
+    # 7.2) Make DAILY BCB data on the IBOV calendar. Use long index from ps_bcb
+    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, ps_bcb.price_data.index)
 
-    # 3) Get daily IBOV + USD via same logic as plot_idx1_v_idx2
+    # 7.3) Get daily IBOV + USD via same logic as plot_idx1_v_idx2 but with longer PlotSetup
     idx1 = "^BVSP"
     idx2 = "BRL=X"
-    df_idx_usd = get_idx1_idx2(idx1, idx2, config, fileloc, ps)
-    df_idx_usd.index = pd.to_datetime(df_idx_usd.index)
+    df_idx_usd_bcb = get_idx1_idx2(idx1, idx2, config, fileloc, ps_bcb)
+    df_idx_usd_bcb.index = pd.to_datetime(df_idx_usd_bcb.index)
 
     # Align USD to the PlotSetup price_data dates
-    usd_series = df_idx_usd[idx2].reindex(ps.price_data.index)
+    usd_series_bcb = df_idx_usd_bcb[idx2].reindex(ps_bcb.price_data.index)
 
-    # 4) Plot grid: ps + daily BCB + smooth USD
+    # 4) Plot grid: ps + daily BCB + smooth USD using longer PlotSetup
     figs = plot_bcb_grid(ps_bcb,
-                         df_bcb_daily_long,
-                         usd_series=usd_series,
+                         df_bcb_daily,
+                         usd_series=usd_series_bcb,
                          nrows=3, ncols=2)
     for fig in figs:
         fig.show()
     plt.show()
-
 
 
 ###################################
