@@ -18,18 +18,19 @@ SERIES = {
     3546: "International Reserves Total (US$ million, monthly )",
     22701: "Current Account - monthly - net (US$ million)",
     23079: "Current account accumulated in 12 months in relation to GDP - monthly (%)",
-    #29581: "Percentage of the highest risk balance of the credit portfolio – Non-financial corporations – Total",
+    4395: "Future expectations index - Economic activity and price indicators",
     27815: "Broad money supply - M4 (end-of-period balance)",
     433: "IPCA",
-    1178: "SELIC Policy Interest Rate (annualized, 252-day basis)",
     11: "Selic Diária",
+    4390: "Selic Acumulada no mes",
+    1178: "SELIC Policy Interest Rate (annualized, 252-day basis)",
     256: "Taxa Juros Longo Prazo",
     24363: "CB Economic Activity Index",
     27574: "Índice de Commodities - (IC-Br)",
     27575: "IC-Br - Agropecuária",
     27577: "IC-Br - Energia",
     27576: "IC-Br - Metal",
-    4390: "Selic Acumulada no mes",
+
     4468: "Net public debt - Balances in reais (million) - Total - Federal Government and Banco Central",
     13762: "Gross General Government Debt (% of GDP)"
 }

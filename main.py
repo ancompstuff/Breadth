@@ -90,6 +90,7 @@ def main():
     # 7) BCB vs IBOV – grid of single‑BCB charts
     ###################################
     from indicators.bcb_align import forward_fill_bcb_to_daily
+    from indicators.get_idx1_idx2 import get_idx1_idx2
     from plotting.plot_bcb_vs_yahoo import plot_bcb_grid
 
     # 1) Load BCB monthly data produced by build_bcb_files
@@ -102,12 +103,17 @@ def main():
     # 2) Make DAILY BCB data on the IBOV calendar
     df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, index_df.index)
 
-    # 3) Plot grid: each subplot = IBOV vs one BCB series (raw)
-    figs = plot_bcb_grid(ps, df_bcb_daily, nrows=2, ncols=3)
+    # 3) Get daily IBOV + USD via same logic as plot_idx1_v_idx2
+    idx1 = "^BVSP"
+    idx2 = "BRL=X"
+    df_idx_usd = get_idx1_idx2(idx1, idx2, config, fileloc, ps)
+    df_idx_usd.index = pd.to_datetime(df_idx_usd.index)
 
-    """# 4) Show all figures
-    for fig in figs:
-        fig.show()"""
+    # Align USD to the PlotSetup price_data dates
+    usd_series = df_idx_usd[idx2].reindex(ps.price_data.index)
+
+    # 4) Plot grid: ps + daily BCB + smooth USD
+    figs = plot_bcb_grid(ps, df_bcb_daily, usd_series=usd_series)
     plt.show()
 
 
