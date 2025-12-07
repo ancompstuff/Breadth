@@ -78,7 +78,7 @@ BCB_SERIES: dict[int, dict[str, str | int]] = {
         "long_name": "General Industrial Output",
         "short_name": "Ind. Output",
     },
-    1402: {
+    1404: {
         "sgs_code": 1404,
         "long_name": "Industrial Electrical consumption GWh",
         "short_name": "Ind. Elec Cons.",

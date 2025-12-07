@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+from dataclasses import replace
 
 from core.constants import file_locations
 from core.my_data_types import load_file_locations_dict
@@ -66,8 +67,12 @@ def main():
     ###################################
     from plotting.common_plot_setup import prepare_plot_data
     ps = prepare_plot_data(index_df, components_df, config)
+    #print("price_data columns:", ps.price_data.columns.tolist())
 
-    print("price_data columns:", ps.price_data.columns.tolist())
+    # Make a copy of config with doubled lookback for BCB plots
+    config_long = replace(config, graph_lookback=config.graph_lookback * 2)
+    # Second PlotSetup with 2× window
+    ps_bcb = prepare_plot_data(index_df, components_df, config_long)
 
     ###################################
     # 6) STANDARD PLOTS
@@ -113,7 +118,10 @@ def main():
     usd_series = df_idx_usd[idx2].reindex(ps.price_data.index)
 
     # 4) Plot grid: ps + daily BCB + smooth USD
-    figs = plot_bcb_grid(ps, df_bcb_daily, usd_series=usd_series)
+    figs = plot_bcb_grid(ps_bcb,
+                         df_bcb_daily_long,
+                         usd_series=usd_series,
+                         nrows=3, ncols=2)
     for fig in figs:
         fig.show()
     plt.show()

@@ -134,6 +134,15 @@ def build_bcb_files(fileloc):
       - BCB_IPCA_SELIC.csv (Selic Diária + IPCA subset)
     into fileloc.bacen_downloaded_data_folder.
     """
+
+    ##################################################################################################
+    # For one-time full refresh, force downloader to ignore last_date_global and reload all from 2010:
+    # run in terminal:
+    #
+
+    # Use correct dynamic start date block below
+    ##################################################################################################
+
     OUT_DIR = fileloc.bacen_downloaded_data_folder
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -150,11 +159,26 @@ def build_bcb_files(fileloc):
         if not existing_df.empty:
             last_date_global = existing_df.index.max().date()
 
+    ########################################
     # Decide dynamic START_DATE for this run
+    # NORMAL USE
+    ########################################
     if last_date_global is not None:
         dynamic_start = last_date_global + timedelta(days=1)
     else:
         dynamic_start = START_DATE
+
+    """########################################
+    # Decide dynamic START_DATE for this run
+    # USE WHEN DOING REFRESH
+    ########################################
+    if last_date_global is not None:
+        # TEMPORARY: force full rebuild
+        # dynamic_start = last_date_global + timedelta(days=1)
+        dynamic_start = START_DATE
+    else:
+        dynamic_start = START_DATE"""
+
 
     print(f"BCB download start date for this run: {dynamic_start} (end = {END_DATE})")
 
@@ -169,19 +193,28 @@ def build_bcb_files(fileloc):
         s_new = fetch_sgs_series(sgs_code, start=dynamic_start, end=END_DATE)
 
         if existing_df is not None and long_name in existing_df.columns:
+            # Existing series: merge old + new
             s_old = existing_df[long_name]
 
             if s_new is None or s_new.empty:
+                # Keep the old data; nothing new fetched
+                print(f"    No new data for {long_name}; keeping existing series.")
                 s_merged = s_old
             else:
                 s_merged = (
                     pd.concat([s_old, s_new])
-                      .sort_index()
-                      .drop_duplicates()
+                    .sort_index()
+                    .drop_duplicates()
                 )
             all_series[long_name] = s_merged
+
         else:
-            all_series[long_name] = s_new
+            # New series: only add if we fetched something
+            if s_new is None or s_new.empty:
+                print(f"    No data fetched for NEW series {long_name}; skipping (won't add empty column).")
+                continue
+            else:
+                all_series[long_name] = s_new
 
     # Align into one DataFrame
     df = pd.concat(all_series.values(), axis=1, join="outer")
