@@ -6,34 +6,13 @@ import os
 
 from core.constants import file_locations
 from core.my_data_types import load_file_locations_dict
+from core.bcb_config import BCB_SERIES, BCB_LONG_BY_CODE
 
 
 # -----------------------------
 # Configuration
 # -----------------------------
 BASE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{code}/dados"
-
-SERIES = {
-    1: "BRL/USD Exchange Rate – End of period (commercial rate)",
-    3546: "International Reserves Total (US$ million, monthly )",
-    22701: "Current Account - monthly - net (US$ million)",
-    23079: "Current account accumulated in 12 months in relation to GDP - monthly (%)",
-    4395: "Future expectations index - Economic activity and price indicators",
-    27815: "Broad money supply - M4 (end-of-period balance)",
-    433: "IPCA",
-    11: "Selic Diária",
-    4390: "Selic Acumulada no mes",
-    1178: "SELIC Policy Interest Rate (annualized, 252-day basis)",
-    256: "Taxa Juros Longo Prazo",
-    24363: "CB Economic Activity Index",
-    27574: "Índice de Commodities - (IC-Br)",
-    27575: "IC-Br - Agropecuária",
-    27577: "IC-Br - Energia",
-    27576: "IC-Br - Metal",
-
-    4468: "Net public debt - Balances in reais (million) - Total - Federal Government and Banco Central",
-    13762: "Gross General Government Debt (% of GDP)"
-}
 
 START_DATE = date(2010, 1, 1)
 END_DATE = date.today()
@@ -63,12 +42,12 @@ def generate_date_chunks(start: date, end: date, max_years: int):
 
 
 # -----------------------------
-# Fetch one series
+# Fetch one BCB_SERIES
 # -----------------------------
-def fetch_sgs_series(code: int,
+def fetch_sgs_series(sgs_code: int,
                      start: date = START_DATE,
                      end: date = END_DATE) -> pd.Series:
-    max_years = SERIES_MAX_YEARS.get(code, DEFAULT_MAX_YEARS_PER_REQUEST)
+    max_years = SERIES_MAX_YEARS.get(sgs_code, DEFAULT_MAX_YEARS_PER_REQUEST)
     all_chunks = []
 
     for chunk_start, chunk_end in generate_date_chunks(start, end, max_years):
@@ -77,31 +56,30 @@ def fetch_sgs_series(code: int,
             "dataInicial": date_to_str(chunk_start),
             "dataFinal": date_to_str(chunk_end),
         }
-        url = BASE_URL.format(code=code)
+        url = BASE_URL.format(code=sgs_code)
         headers = {
             "User-Agent": "python-requests-bcb-dashboard/1.0",
             "Accept": "text/csv, */*;q=0.8",
         }
-
         print(f"  -> chunk {date_to_str(chunk_start)} to {date_to_str(chunk_end)}")
         try:
             resp = requests.get(url, params=params, headers=headers, timeout=30)
             resp.raise_for_status()
         except requests.HTTPError as e:
-            print(f"    HTTP error for code {code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
+            print(f"    HTTP error for sgs_code {sgs_code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
             continue
         except requests.RequestException as e:
-            print(f"    Request error for code {code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
+            print(f"    Request error for sgs_code {sgs_code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
             continue
 
         text = resp.text
         if not text.strip():
-            print(f"    Empty response for code {code} on this chunk; skipping.")
+            print(f"    Empty response for sgs_code {sgs_code} on this chunk; skipping.")
             continue
 
         first_100 = text[:100].lower()
         if "<html" in first_100 or "<!doctype html" in first_100:
-            print(f"    Non-CSV (HTML) response for code {code}; skipping this chunk.")
+            print(f"    Non-CSV (HTML) response for sgs_code {sgs_code}; skipping this chunk.")
             continue
 
         try:
@@ -113,33 +91,35 @@ def fetch_sgs_series(code: int,
                 dayfirst=True,
             )
         except ValueError as e:
-            print(f"    CSV parse error for code {code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
+            print(f"    CSV parse error for sgs_code {sgs_code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
             try:
                 df_raw = pd.read_csv(StringIO(text), sep=";", decimal=",")
-                print(f"    Raw columns for code {code}: {df_raw.columns.tolist()}")
+                print(f"    Raw columns for sgs_code {sgs_code}: {df_raw.columns.tolist()}")
             except Exception as e2:
-                print(f"    Failed to inspect raw CSV for code {code}: {e2}")
+                print(f"    Failed to inspect raw CSV for sgs_code {sgs_code}: {e2}")
             continue
         except Exception as e:
-            print(f"    Unexpected CSV error for code {code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
+            print(f"    Unexpected CSV error for sgs_code {sgs_code} on {params['dataInicial']}–{params['dataFinal']}: {e}")
             continue
 
         df.columns = [c.strip().lower() for c in df.columns]
         if "data" not in df.columns or "valor" not in df.columns:
-            print(f"    Unexpected CSV columns for code {code}: {df.columns.tolist()} – skipping chunk.")
+            print(f"    Unexpected CSV columns for sgs_code {sgs_code}: {df.columns.tolist()} – skipping chunk.")
             continue
 
         all_chunks.append(df[["data", "valor"]])
 
     if not all_chunks:
-        print(f"  !! No valid data fetched for code {code}.")
+        print(f"  !! No valid data fetched for sgs_code {sgs_code}.")
         return pd.Series(dtype="float64")
+
+    full_df = pd.concat(all_chunks, ignore_index=True)
 
     full_df = pd.concat(all_chunks, ignore_index=True)
     full_df = full_df.drop_duplicates(subset=["data"]).sort_values("data")
 
     s = full_df.set_index("data")["valor"].astype("float64")
-    s.name = SERIES.get(code, str(code))
+    s.name = BCB_LONG_BY_CODE.get(sgs_code, str(sgs_code))
     return s
 
 
@@ -179,16 +159,17 @@ def build_bcb_files(fileloc):
     print(f"BCB download start date for this run: {dynamic_start} (end = {END_DATE})")
 
     # -----------------------------
-    # Download all series
+    # Download all BCB_SERIES
     # -----------------------------
     all_series = {}
 
-    for code, label in SERIES.items():
-        print(f"Downloading {code} - {label} ...")
-        s_new = fetch_sgs_series(code, start=dynamic_start, end=END_DATE)
+    for sgs_code, meta in BCB_SERIES.items():
+        long_name = meta["long_name"]
+        print(f"Downloading {sgs_code} - {long_name} ...")
+        s_new = fetch_sgs_series(sgs_code, start=dynamic_start, end=END_DATE)
 
-        if existing_df is not None and label in existing_df.columns:
-            s_old = existing_df[label]
+        if existing_df is not None and long_name in existing_df.columns:
+            s_old = existing_df[long_name]
 
             if s_new is None or s_new.empty:
                 s_merged = s_old
@@ -198,9 +179,9 @@ def build_bcb_files(fileloc):
                       .sort_index()
                       .drop_duplicates()
                 )
-            all_series[label] = s_merged
+            all_series[long_name] = s_merged
         else:
-            all_series[label] = s_new
+            all_series[long_name] = s_new
 
     # Align into one DataFrame
     df = pd.concat(all_series.values(), axis=1, join="outer")

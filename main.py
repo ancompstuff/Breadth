@@ -114,6 +114,8 @@ def main():
 
     # 4) Plot grid: ps + daily BCB + smooth USD
     figs = plot_bcb_grid(ps, df_bcb_daily, usd_series=usd_series)
+    for fig in figs:
+        fig.show()
     plt.show()
 
 
