@@ -19,6 +19,7 @@ def plot_close_vol_obv(ps: PlotSetup, df_in: pd.DataFrame):
         sharex=True,
         height_ratios=[5, 5, 1]
     )
+
     # =============================================
     # TOP — PRICE + VOLUME bars
     # =============================================
