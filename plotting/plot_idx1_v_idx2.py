@@ -99,7 +99,7 @@ def plot_idx1_v_idx2(idx1, idx2, config, fileloc, plot_setup):
         labels.extend(l)
 
     ax_corr.legend(handles, labels, loc="upper left")
-
+"""
     # ----------------------------------------------------------------------
     # 2) SELIC subplot
     # ----------------------------------------------------------------------
@@ -160,3 +160,4 @@ def plot_idx1_v_idx2(idx1, idx2, config, fileloc, plot_setup):
 
     #fig.tight_layout()
     return fig
+"""

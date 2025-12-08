@@ -236,12 +236,12 @@ def build_bcb_files(fileloc):
     df_m.to_csv(monthly_csv_path, index_label="date")
     print(f"Saved monthly data to: {monthly_csv_path}")
 
-    # Subset for get_idx1_idx2: Selic Diária + IPCA
+    """# Subset for get_idx1_idx2: Selic Diária + IPCA
     subset_cols = [c for c in df_m.columns if c in ["Selic Diária", "IPCA"]]
     bcb_subset = df_m[subset_cols].copy()
     bcb_ipca_selic_path = os.path.join(OUT_DIR, "BCB_IPCA_SELIC.csv")
     bcb_subset.to_csv(bcb_ipca_selic_path, index_label="date")
-    print(f"Saved BCB_IPCA_SELIC.csv to: {bcb_ipca_selic_path}")
+    print(f"Saved BCB_IPCA_SELIC.csv to: {bcb_ipca_selic_path}")"""
 
 
 # -----------------------------

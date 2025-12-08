@@ -80,49 +80,51 @@ def main():
     # 6) STANDARD PLOTS
     ###################################
 
-    # Close/Volume/OBV
-    from plotting.close_vol_obv import plot_close_vol_obv
+    #--------------------
+    # 1: Close/Volume/OBV
+    #--------------------
+    from plotting.plot_close_vol_obv import plot_close_vol_obv
     fig1 = plot_close_vol_obv(ps, out_df)
-    plt.show()
+    #plt.show()
 
-    # IBOV vs USD + SELIC + IPCA (uses get_idx1_idx2 → BCB_IPCA_SELIC.csv)
+    """# IBOV vs USD + SELIC + IPCA (uses get_idx1_idx2 → BCB_IPCA_SELIC.csv)
     from plotting.plot_idx1_v_idx2 import plot_idx1_v_idx2
     idx1 = "^BVSP"
     idx2 = "BRL=X"
     fig2 = plot_idx1_v_idx2(idx1, idx2, config, fileloc, ps)
-    plt.show()
+    plt.show()"""
 
-    ###################################
-    # 7) BCB vs IBOV – grid of single-BCB charts
-    ###################################
+    #-------------------------------------------
+    # 2: BCB vs IBOV – grid of single-BCB charts
+    #-------------------------------------------
     from indicators.bcb_align import forward_fill_bcb_to_daily
     from indicators.get_idx1_idx2 import get_idx1_idx2
     from plotting.plot_bcb_grid import plot_bcb_grid
 
-    # 7.1) Load BCB monthly data
+    # a) Load BCB monthly data
     bcb_monthly_path = os.path.join(
         fileloc.bacen_downloaded_data_folder,
         "bcb_dashboard_monthly.csv",
     )
     df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
 
-    # 7.2) Convert BCB data to DAILY using IBOV calendar (ps_bcb)
+    # b) Convert BCB data to DAILY using IBOV calendar (ps_bcb)
     df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, ps_bcb.price_data.index)
 
-    # 7.3) IBOV + USD with doubled lookback (config_bcb)
+    # c) IBOV + USD with doubled lookback (config_bcb)
     idx1 = "^BVSP"
     idx2 = "BRL=X"
     df_idx_usd_bcb = get_idx1_idx2(idx1, idx2, config_bcb, fileloc, ps_bcb)
     df_idx_usd_bcb.index = pd.to_datetime(df_idx_usd_bcb.index)
 
-    # USD aligned to ps_bcb price index
+    # d) USD aligned to ps_bcb price index
     src = df_idx_usd_bcb[idx2].sort_index()
     tgt = ps_bcb.price_data.index
 
-    # First pass: reindex + ffill
+    # e) First pass: reindex + ffill
     usd_series_bcb = src.reindex(tgt).ffill()
 
-    # If still contains NaNs (rare), use merge_asof
+    # f) If still contains NaNs (rare), use merge_asof
     if usd_series_bcb.isna().any():
         left = pd.DataFrame({"t": tgt})
         right = src.reset_index().rename(columns={"index": "t", idx2: "val"})
@@ -134,7 +136,7 @@ def main():
         )
         usd_series_bcb = pd.Series(merged["val"].values, index=tgt).ffill()
 
-    # 7.4) Plot grid
+    # g) Plot grid
     figs = plot_bcb_grid(
         ps_bcb,
         df_bcb_daily,
@@ -146,6 +148,15 @@ def main():
     for fig in figs:
         fig.show()
 
+    #plt.show()
+
+    #-------------------
+    # 3: BVSP vs Indexes
+    #-------------------
+    import plotting.plot_bvsp_vs_indexes as ppbi
+    figs = ppbi.plot_bvsp_vs_all_indices(ps_bcb, fileloc, nrows=3, ncols=2)
+    for f in figs:
+        f.show()
     plt.show()
 
 
