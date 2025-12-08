@@ -39,6 +39,9 @@ def main():
     #----------------------------------
     config = what_do_you_want_to_do(fileloc)
 
+    from utils.update_bcb_y_or_n import ask_update_bcb
+    update_bcb = ask_update_bcb()
+
     #-----------------------------------------------------------------------------
     # 3) Execute the requested action (update DB or rebuild DBs) and align indexes
     #-----------------------------------------------------------------------------
@@ -52,8 +55,11 @@ def main():
     #-----------------------
     # 3) Build BCB files
     #-----------------------
-    from main_modules.build_bcb_files import build_bcb_files
-    build_bcb_files(fileloc)
+    if update_bcb:
+        from main_modules.build_bcb_files import build_bcb_files
+        build_bcb_files(fileloc)
+    else:
+        print("BCB update skipped. Using existing BCB data.")
 
     ###################################
     # 4) Indicator calculations
