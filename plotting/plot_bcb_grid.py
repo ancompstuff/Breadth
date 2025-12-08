@@ -153,10 +153,10 @@ def plot_bcb_grid(
             ax.tick_params(axis="x", labelbottom=True)
             ax.set_xticklabels(xlabels, rotation=45, fontsize=8)
 
-        fig.suptitle(
+        """fig.suptitle(
             f"{ps.idx} vs BCB indicators (raw, {len(chunk)} series)",
             fontsize=14,
-        )
+        )"""
 
     return figs
 
