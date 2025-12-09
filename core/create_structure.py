@@ -31,7 +31,7 @@ structure = {
     "plotting": [
         "__init__.py",
         "common_plot_setup.py",
-        "index_vs_ma.py",
+        "ma_indicators.py",
         "volume_plots.py",
         "highs_lows_plots.py",
         "breadth_plots.py",
