@@ -1,19 +1,3 @@
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
-from core.constants import yahoo_market_details
-
-
-def load_index_adj_close(idx_code: str, fileloc) -> pd.Series:
-    path = os.path.join(fileloc.yahoo_downloaded_data_folder, f"INDEX_{idx_code}.csv")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Missing index file: {path}")
-    df = pd.read_csv(path, index_col=0, parse_dates=True)
-    df = df[~df.index.duplicated(keep="first")]
-    if "Adj Close" not in df.columns:
-        raise ValueError(f"Adj Close column missing for index {idx_code}")
-    return df["Adj Close"].sort_index()
-
 
 import os
 import pandas as pd
