@@ -1,9 +1,11 @@
 # IMPORT FUNCTIONS
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import pandas as pd
 import os
 from dataclasses import replace
+from datetime import datetime
 
 from core.constants import file_locations
 from core.my_data_types import load_file_locations_dict
@@ -79,8 +81,8 @@ def main():
     #print("price_data columns:", ps.price_data.columns.tolist())
 
     ## 2) BCB PlotSetup with 2× lookback
-    config_bcb = replace(config, graph_lookback=config.graph_lookback * 2)
-    ps_bcb = prepare_plot_data(index_df, components_df, config_bcb)
+    config_bcb = replace(config, graph_lookback=config.graph_lookback * 5)
+    ps_long_lookback = prepare_plot_data(index_df, components_df, config_bcb)
 
     ###################################
     # 6) STANDARD PLOTS
@@ -114,18 +116,18 @@ def main():
     )
     df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
 
-    # b) Convert BCB data to DAILY using IBOV calendar (ps_bcb)
-    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, ps_bcb.price_data.index)
+    # b) Convert BCB data to DAILY using IBOV calendar (ps_long_lookback)
+    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, ps_long_lookback.price_data.index)
 
     # c) IBOV + USD with doubled lookback (config_bcb)
     idx1 = "^BVSP"
     idx2 = "BRL=X"
-    df_idx_usd_bcb = get_idx1_idx2(idx1, idx2, config_bcb, fileloc, ps_bcb)
+    df_idx_usd_bcb = get_idx1_idx2(idx1, idx2, config_bcb, fileloc, ps_long_lookback)
     df_idx_usd_bcb.index = pd.to_datetime(df_idx_usd_bcb.index)
 
-    # d) USD aligned to ps_bcb price index
+    # d) USD aligned to ps_long_lookback price index
     src = df_idx_usd_bcb[idx2].sort_index()
-    tgt = ps_bcb.price_data.index
+    tgt = ps_long_lookback.price_data.index
 
     # e) First pass: reindex + ffill
     usd_series_bcb = src.reindex(tgt).ffill()
@@ -144,26 +146,65 @@ def main():
 
     # g) Plot grid
     figs = plot_bcb_grid(
-        ps_bcb,
+        ps_long_lookback,
         df_bcb_daily,
         usd_series=usd_series_bcb,
         nrows=3,
         ncols=2,
     )
-
-    for fig in figs:
-        fig.show()
-
-    #plt.show()
+    #for fig in figs:
+    #    fig.show()
 
     #-------------------
     # 3: BVSP vs Indexes
     #-------------------
     import plotting.plot_bvsp_vs_indexes as ppbi
-    figs = ppbi.plot_bvsp_vs_all_indices(ps_bcb, fileloc, nrows=3, ncols=2)
-    for f in figs:
-        f.show()
-    plt.show()
+    figs = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
+    #for fig in figs:
+    #    fig.show()
+    #plt.show()
+
+
+    #---------------------------------------------
+    # MAKE PDF -----------------------------------
+    #---------------------------------------------
+    # Create the output PDF path
+    pdf_filename = f"{ps.mkt} breadth_{datetime.today().strftime('%Y-%m-%d')}.pdf"
+    pdf_path = os.path.join(fileloc.pdf_folder, pdf_filename)
+
+    # Open the PDF file to save plots
+    with PdfPages(pdf_path) as pdf:
+
+        fig = plot_close_vol_obv(ps, out_df)
+        pdf.savefig(fig1)
+        plt.close(fig1)
+
+        figs = plot_bcb_grid(
+            ps_long_lookback,
+            df_bcb_daily,
+            usd_series=usd_series_bcb,
+            nrows=3,
+            ncols=2,
+        )
+        for fig in figs:
+            pdf.savefig(fig)
+            plt.close(fig)
+
+        figs = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
+        for f in figs:
+            pdf.savefig(f)
+            plt.close(f)
+
+        # -----------------------------------
+        # Open PDF automatically if possible
+        # -----------------------------------
+        if os.path.exists(pdf_path):
+            try:
+                os.startfile(pdf_path)  # For Windows
+            except AttributeError:
+                os.system(f'open "{pdf_path}"')  # For macOS/Linux
+        else:
+            print("PDF not generated: ", pdf_path)
 
 
 ###################################

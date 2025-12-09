@@ -97,6 +97,7 @@ def plot_bvsp_vs_all_indices(ps, fileloc, nrows=3, ncols=2):
 
                 # Plot BVSP on the left y-axis
                 ps.plot_price_layer(ax_left)
+                ax_left.set_ylabel(f"IBOV R$", fontsize=8)
 
                 # Plot the other index on the right y-axis
                 ax_right.plot(ps.plot_index, series, color="blue", label=code, linewidth=1.2)
