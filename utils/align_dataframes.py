@@ -51,7 +51,8 @@ def align_and_prepare_for_plot(df1: pd.DataFrame, df2: pd.DataFrame, verbose: bo
         raise ValueError("No common trading dates found between df_eod and df_idx.")
 
     # Step 3: Filter both to those dates (direct indexing is much faster than isin)
-    df2 = df2.loc[common_dates]
-    df1 = df1.loc[common_dates]
+    # Note: common_dates is already sorted, but we sort DataFrames to ensure proper chronological order
+    df2 = df2.loc[common_dates].sort_index()
+    df1 = df1.loc[common_dates].sort_index()
 
     return df1, df2
