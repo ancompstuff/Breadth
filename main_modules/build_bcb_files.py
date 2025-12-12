@@ -114,8 +114,6 @@ def fetch_sgs_series(sgs_code: int,
         return pd.Series(dtype="float64")
 
     full_df = pd.concat(all_chunks, ignore_index=True)
-
-    full_df = pd.concat(all_chunks, ignore_index=True)
     full_df = full_df.drop_duplicates(subset=["data"]).sort_values("data")
 
     s = full_df.set_index("data")["valor"].astype("float64")

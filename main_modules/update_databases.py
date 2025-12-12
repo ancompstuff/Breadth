@@ -84,18 +84,16 @@ def update_databases(config, fileloc):
                             new_data = new_data.droplevel(1, axis=1)
 
                         new_data.index = pd.to_datetime(new_data.index, errors="coerce")
-                        updated = pd.concat([df, new_data])
-                        updated = updated[~updated.index.duplicated(keep="first")]
-                        updated.to_csv(idx_path)
+                        df = pd.concat([df, new_data])
+                        df = df[~df.index.duplicated(keep="first")]
+                        df.to_csv(idx_path)
                         print(f"----------------- ✔ Saved updated index: {idx_path} -------------")
                     else:
                         print(f"-------------- No new index data for {idx_code} ---------------")
 
-                # If this is the market being studied → reload after update
+                # If this is the market being studied → save reference (df is already updated)
                 if idx_code == idx_code_to_study:
-                    index_to_study_df = pd.read_csv(idx_path, index_col=0, parse_dates=True)
-                    index_to_study_df.index = pd.to_datetime(index_to_study_df.index, errors="coerce")
-                    index_to_study_df = index_to_study_df[~index_to_study_df.index.duplicated(keep="first")]
+                    index_to_study_df = df
 
             except FileNotFoundError:
                 print(f"❌ Index file missing: {idx_path}. Skipping.")
@@ -157,24 +155,14 @@ def update_databases(config, fileloc):
                         print(f"--------- No missing component data for {market_name} ----------------")
                     else:
                         comp_new_data.index = pd.to_datetime(comp_new_data.index, errors="coerce")
-                        updated = pd.concat([comp_df, comp_new_data], axis=0)
-                        updated = updated[~updated.index.duplicated(keep="first")].sort_index()
-                        updated.to_csv(comp_path)
+                        comp_df = pd.concat([comp_df, comp_new_data], axis=0)
+                        comp_df = comp_df[~comp_df.index.duplicated(keep="first")].sort_index()
+                        comp_df.to_csv(comp_path)
                         print(f"----------- ✔ Components updated: {comp_path} ----------------")
 
                 if market_name == market_name_to_study:
-                    components_to_study_df = pd.read_csv(comp_path,
-                                                         index_col=0,
-                                                         header=[0, 1],
-                                                         parse_dates=True
-                                                         )
-                    components_to_study_df.index = pd.to_datetime(
-                        components_to_study_df.index,
-                        errors="coerce"
-                    )
-                    components_to_study_df = (
-                        components_to_study_df)[~components_to_study_df.index.duplicated(keep="first")
-                    ]
+                    # Reuse already loaded and processed comp_df instead of re-reading
+                    components_to_study_df = comp_df
 
             except FileNotFoundError:
                 print(f"❌ Component file missing: {comp_path}. Skipping.")
