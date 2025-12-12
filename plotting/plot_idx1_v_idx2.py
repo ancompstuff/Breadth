@@ -121,6 +121,7 @@ def plot_idx1_v_idx2(idx1, idx2, config, fileloc, plot_setup):
     handles, labels = [], []
     for ax in [ax_selic, ax_selic_r]:
         h, l = ax.get_legend_handles_labels()
+        
         handles.extend(h)
         labels.extend(l)
 

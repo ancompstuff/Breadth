@@ -4,6 +4,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import pandas as pd
 import os
+import time
 from dataclasses import replace
 from datetime import datetime
 
@@ -41,6 +42,7 @@ def main():
     #----------------------------------
     config = what_do_you_want_to_do(fileloc)
 
+    # Update BCB data or not (monthly and takes a while)
     from utils.update_bcb_y_or_n import ask_update_bcb
     update_bcb = ask_update_bcb()
 
@@ -164,6 +166,17 @@ def main():
     #    fig.show()
     #plt.show()
 
+    # -------------------
+    # 3: MA/ VWMA vs Indexes
+    # -------------------
+    from main_modules.create_databases import create_databases  # or update_databases
+    import indicators.ma_indicators as mai
+    import plotting.plot_ma_indicators_1 as pmai
+
+    df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(index_df, components_df)
+    df_idx_with_osc = mai.calculate_ma_vwma_max_min(df_idx_mas, ps)
+    df_idx_agg = mai.calculate_tickers_over_under_mas(df_idx_mas, df_eod_mas, ps)
+    df_idx_compress, df_comp_compress = mai.calculate_compressao_dispersao(df_idx_mas, df_eod_mas)
 
     #---------------------------------------------
     # MAKE PDF -----------------------------------
@@ -175,37 +188,56 @@ def main():
     # Open the PDF file to save plots
     with PdfPages(pdf_path) as pdf:
 
-        fig = plot_close_vol_obv(ps, out_df)
+        fig1 = plot_close_vol_obv(ps, out_df)
         pdf.savefig(fig1)
         plt.close(fig1)
 
-        figs = plot_bcb_grid(
+        figs_2 = plot_bcb_grid(
             ps_long_lookback,
             df_bcb_daily,
             usd_series=usd_series_bcb,
             nrows=3,
             ncols=2,
         )
-        for fig in figs:
+        for fig in figs_2:
             pdf.savefig(fig)
             plt.close(fig)
 
-        figs = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
-        for f in figs:
-            pdf.savefig(f)
-            plt.close(f)
+        figs_3 = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
+        for fig in figs_3:
+            pdf.savefig(fig)
+            plt.close(fig)
 
-        # -----------------------------------
-        # Open PDF automatically if possible
-        # -----------------------------------
-        if os.path.exists(pdf_path):
-            try:
-                os.startfile(pdf_path)  # For Windows
-            except AttributeError:
-                os.system(f'open "{pdf_path}"')  # For macOS/Linux
-        else:
-            print("PDF not generated: ", pdf_path)
+        fig4 = pmai.plot_index_vs_ma_vwma(df_idx_with_osc, ps)
+        pdf.savefig(fig4)
+        plt.close(fig4)
+        fig5 = pmai.plot_tickers_over_under_mas(df_idx_agg, ps)
+        pdf.savefig(fig5)
+        plt.close(fig5)
+        #fig6 = pmai.plot_compression_dispersion(df_idx_compress, df_comp_compress, ps)
+        #pdf.savefig(fig6)
+        #plt.close(fig6)
+        fig6 = pmai.plot_absolute_compression_bands(df_idx_compress, df_comp_compress, ps)
+        pdf.savefig(fig6)
+        plt.close(fig6)
 
+    # *** CRITICAL: The file is closed here ***
+    # Introduce a small delay to ensure the OS releases the file lock
+    time.sleep(0.5)  # Wait for half a second (0.1 to 1.0 second is usually enough)
+
+    # -----------------------------------
+    # Open PDF automatically if possible
+    # -----------------------------------
+    if os.path.exists(pdf_path):
+        try:
+            os.startfile(pdf_path)  # For Windows
+        except AttributeError:
+            os.system(f'open "{pdf_path}"')  # For macOS/Linux
+        except FileNotFoundError:
+            # This handles cases where the path is valid but the file still isn't fully ready
+            print(f"Error: Could not find or open file {pdf_path}. Try opening manually.")
+    else:
+        print("PDF not generated: ", pdf_path)
 
 ###################################
 # Main

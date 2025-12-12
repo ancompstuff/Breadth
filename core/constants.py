@@ -77,10 +77,10 @@ print("EXISTS =", file_locations["yahoo_downloaded_data_folder"].exists())
 
 ma_groups = {
         "short": {"periods": [5, 12, 25],
-                  "color": "blue",
+                  "color": "red",
                   "port": "curtas"},
-        "mid": {"periods": [40, 80],
-                "color": "cyan",
+        "medium": {"periods": [40, 80],
+                "color": "springgreen",
                 "port": "médias"},
         "long": {"periods": [50, 100, 200],
                  "color": "darkblue",

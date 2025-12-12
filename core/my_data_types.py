@@ -131,30 +131,10 @@ class PlotSetup:
         # VERTICAL GRID (x-axis)
         ax.grid(True, axis='x', linestyle='-', alpha=0.3, color='gray', linewidth=0.8)
 
+    def fix_xlimits(self, ax):
+        ax.set_xlim(-0.5, len(self.plot_index) - 0.5)
 
 #==========================================================================================
 # Other Dataclasses
 #==========================================================================================
-@dataclass
-class MarketData:
-    idx: pd.DataFrame
-    comp: pd.DataFrame
-    config: Config
-
-
-@dataclass
-class MAResult:
-    idx: pd.DataFrame
-    comp: pd.DataFrame
-
-
-@dataclass
-class BreadthResult:
-    df: pd.DataFrame
-
-
-@dataclass
-class CompressionResult:
-    idx: pd.DataFrame
-    comp: pd.DataFrame
 

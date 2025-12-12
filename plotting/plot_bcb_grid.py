@@ -5,11 +5,9 @@ from core.my_data_types import PlotSetup
 from core.bcb_config import BCB_SHORT_BY_LONG
 
 def plot_bcb_grid(
-    ps: PlotSetup,
-    df_bcb_daily: pd.DataFrame,
-    usd_series: pd.Series | None = None,
-    nrows: int = 3,
-    ncols: int = 2,
+        ps: PlotSetup,    df_bcb_daily: pd.DataFrame,
+        usd_series: pd.Series | None = None,
+        nrows: int = 3, ncols: int = 2
 ):
     """
     Fixed version:
@@ -43,7 +41,7 @@ def plot_bcb_grid(
     left_min = adj.min()
     left_max = adj.max()
 
-    # Sparse tick positions
+    """# Sparse tick positions
     full_positions = ps.tick_positions
     if not full_positions:
         sparse_positions = []
@@ -51,7 +49,30 @@ def plot_bcb_grid(
         sparse_positions = sorted(set(full_positions[::5] + [full_positions[-1]]))
 
     # Pre-build x-axis label text
-    xlabels = [ps.date_labels[j] for j in sparse_positions]
+    xlabels = [ps.date_labels[j] for j in sparse_positions]"""
+
+    # Sparse tick positions and labels (match BCB grid)
+    full_positions = ps.tick_positions
+    step_size = 5
+    if not full_positions:
+        sparse_positions = []
+        xlabels = []
+    else:
+        # 1. Generate the sparse positions by stepping backward (reverse list)
+        # We use list(reversed(...)) or full_positions[::-1] to step backward.
+        # Then, we slice [::step_size] to get every 5th element.
+        sparse_backwards = full_positions[::-1][::step_size]
+
+        # 2. Reverse the list back to chronological order
+        # Since we started from the end, we must reverse it back to chronological order for plotting.
+        sparse_positions = sorted(sparse_backwards)
+
+        # 3. Ensure the very first tick is included (optional, but good practice)
+        if full_positions[0] not in sparse_positions:
+            sparse_positions.insert(0, full_positions[0])
+        # sparse_positions = sorted(set(full_positions[::5] + [full_positions[-1]]))
+
+        xlabels = [ps.date_labels[j] for j in sparse_positions]
 
     figs: list[plt.Figure] = []
     per_fig = nrows * ncols
