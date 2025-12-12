@@ -2,8 +2,9 @@ import os
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
-from core.constants import yahoo_market_details, bcb_series_catalog, bcb_default_series
+from core.constants import yahoo_market_details
 from main_modules.bcb_data import create_or_update_bcb_database
+
 
 # ======================================================================
 #   UPDATE INDEX + COMPONENTS USING NEW CONFIG + FILELOC STRUCTURE
@@ -24,25 +25,27 @@ def update_databases(config, fileloc):
     # Location of all CSV files
     csv_folder = fileloc.yahoo_downloaded_data_folder
 
-    market_to_study_dict = config.market_to_study  # p.ex: 1: {"market": "Brazil", "idx_code": "^BVSP", "codes_csv": "IBOV.csv"}
-    market_key = next(iter(market_to_study_dict))  # p.ex: 1
-    market_to_study_dict_values = market_to_study_dict[market_key]  # p.ex: {"market": "Brazil", "idx_code": "^BVSP", "codes_csv": "IBOV.csv"}
+    market_to_study_dict = config.market_to_study
+    market_key = next(iter(market_to_study_dict))
+    market_to_study_dict_values = market_to_study_dict[market_key]
     idx_code_to_study = market_to_study_dict_values["idx_code"]
     market_name_to_study = market_to_study_dict_values["market"]
 
     last_date_to_download = config.download_end_date
+    # config.yf_end_date is often T+1, providing the final date for the yfinance API call
     last_yahoo_date_to_download = config.yf_end_date
 
     # -----------------------
     def update_indexes():
-    #------------------------
+        # ------------------------
         print("\n****************************************************************************")
         print("---------------------- Updating ALL Index files -----------------------------")
         print("****************************************************************************\n")
 
         index_to_study_df = None
-        # "key"! is the integer market key,
-        # value the dictionary: "idx_code": "^BVSP", "market": "Bovespa", "codes_csv": "IBOV.csv", "number_tickers": 82}
+        requested_last_date = datetime.strptime(last_date_to_download, "%Y-%m-%d").date()
+        last_yahoo_end_date = datetime.strptime(last_yahoo_date_to_download, "%Y-%m-%d").date()
+
         for key, info in yahoo_market_details.items():
             idx_code = info["idx_code"]
             idx_path = os.path.join(csv_folder, f"INDEX_{idx_code}.csv")
@@ -50,52 +53,94 @@ def update_databases(config, fileloc):
             try:
                 df = pd.read_csv(idx_path, index_col=0, parse_dates=True)
                 df.index = pd.to_datetime(df.index, errors="coerce")
+
+                # Ensure data is sorted
+                df = df.sort_index()
                 df = df[~df.index.duplicated(keep="first")]
+
                 print(f"-------------------- {idx_code} Last row before update -------------------------")
                 print(df.tail(1))
 
-                # Drop "last-zero-volume" line if necessary
-                if df["Volume"].iloc[-1] == 0:
+                # Drop "last-zero-volume" line if necessary (often incomplete data)
+                if not df.empty and "Volume" in df.columns and df["Volume"].iloc[-1] == 0:
                     df = df.iloc[:-1]
 
-                # Get last date in csv to start update
-                start_update_here = df.index[-1] + timedelta(days=1)
-                start_update = start_update_here.strftime("%Y-%m-%d")
+                # --- NEW LOGIC: FIND LAST VALID DATE (NOT NaN) ---
+                start_update = config.yf_start_date  # Default to start
+                last_existing_date = None
 
-                # Check not already up to date
-                requested_last_date = datetime.strptime(last_date_to_download, "%Y-%m-%d").date()
-                if df.index[-1].date() >= requested_last_date:
-                    print(f"-------------------- {idx_code} already up-to-date -------------------------")
+                if not df.empty:
+                    # Look for the last non-NaN date in the 'Close' or 'Adj Close' column
+                    cols_to_check = ['Adj Close', 'Close']
+                    last_valid_idx = None
+                    for col in cols_to_check:
+                        if col in df.columns:
+                            last_valid_idx = df[col].last_valid_index()
+                            if last_valid_idx is not None:
+                                break
 
-                else:
-                    print(f"Updating {idx_code} from {start_update} to {last_yahoo_date_to_download}")
+                    if last_valid_idx is not None:
+                        last_existing_date = last_valid_idx.date()
+                        # Start updating FROM the last valid date (overlap) to ensure continuity
+                        start_update = last_valid_idx.strftime("%Y-%m-%d")
 
-                    new_data = yf.download(idx_code,
-                                           start=start_update,
-                                           end=last_yahoo_date_to_download,
-                                           progress=False,  # show progress bar
-                                           rounding=True,
-                                           auto_adjust=False,
-                                           multi_level_index=False
-                                           )
+                if last_existing_date is not None:
+                    # Skip only if the last *valid* date in the file covers the requested end date
+                    if last_existing_date >= requested_last_date:
+                        print(
+                            f"-------------------- {idx_code} already up-to-date with requested end date ({requested_last_date}) -------------------------")
+                        if idx_code == idx_code_to_study:
+                            index_to_study_df = df
+                        continue
 
-                    if not new_data.empty:
-                        if isinstance(new_data.columns, pd.MultiIndex):
-                            new_data = new_data.droplevel(1, axis=1)
+                        # Also skip if the file date is already >= the YF end date
+                    if last_existing_date >= last_yahoo_end_date:
+                        print(
+                            f"-------------------- {idx_code} already up-to-date with Yahoo end date ({last_yahoo_end_date}) -------------------------")
+                        if idx_code == idx_code_to_study:
+                            index_to_study_df = df
+                        continue
 
-                        new_data.index = pd.to_datetime(new_data.index, errors="coerce")
-                        updated = pd.concat([df, new_data])
-                        updated = updated[~updated.index.duplicated(keep="first")]
+                print(f"Updating {idx_code} from {start_update} to {last_yahoo_date_to_download}")
+
+                new_data = yf.download(idx_code,
+                                       start=start_update,
+                                       end=last_yahoo_date_to_download,
+                                       progress=False,
+                                       rounding=True,
+                                       auto_adjust=False,
+                                       multi_level_index=False
+                                       )
+
+                if not new_data.empty:
+                    # Clean up columns if single ticker download returned MultiIndex
+                    if isinstance(new_data.columns, pd.MultiIndex):
+                        new_data = new_data.droplevel(1, axis=1)
+
+                    new_data.index = pd.to_datetime(new_data.index, errors="coerce")
+
+                    # --- ROBUST CONCATENATION LOGIC: New data overwrites old data on overlap ---
+                    updated = pd.concat([df, new_data])
+                    updated = updated.sort_index()
+                    # Crucial: Drop duplicates, keeping the *last* one (which is from new_data, refreshing the row)
+                    updated = updated[~updated.index.duplicated(keep="last")]
+
+                    # Filter to the requested end date
+                    updated = updated[updated.index.date <= requested_last_date]
+
+                    if not updated.equals(df):  # Check if any change occurred
                         updated.to_csv(idx_path)
                         print(f"----------------- ✔ Saved updated index: {idx_path} -------------")
+                        # Refresh df reference for return
+                        df = updated
                     else:
-                        print(f"-------------- No new index data for {idx_code} ---------------")
+                        print(f"-------------- No new unique index data for {idx_code} ---------------")
+                else:
+                    print(f"-------------- No new index data for {idx_code} ---------------")
 
-                # If this is the market being studied → reload after update
+                # If this is the market being studied → reload/assign for return
                 if idx_code == idx_code_to_study:
-                    index_to_study_df = pd.read_csv(idx_path, index_col=0, parse_dates=True)
-                    index_to_study_df.index = pd.to_datetime(index_to_study_df.index, errors="coerce")
-                    index_to_study_df = index_to_study_df[~index_to_study_df.index.duplicated(keep="first")]
+                    index_to_study_df = df
 
             except FileNotFoundError:
                 print(f"❌ Index file missing: {idx_path}. Skipping.")
@@ -104,28 +149,33 @@ def update_databases(config, fileloc):
 
         return index_to_study_df
 
-
     # -----------------------
     def update_component_csvs():
-    # ------------------------
+        # ------------------------
         print("\n*******************************************************************************")
         print("--------------------- Updating requested component file(s) ------------------------")
         print("*********************************************************************************\n")
         components_to_study_df = None
+        requested_last_date = datetime.strptime(last_date_to_download, "%Y-%m-%d").date()
+        last_yahoo_end_date = datetime.strptime(last_yahoo_date_to_download, "%Y-%m-%d").date()
 
         for key, info in config.to_update.items():
             market_name = info["market"]
             comp_path = os.path.join(csv_folder, f"EOD_{market_name}.csv")
 
             try:
+                # Read with header=[0, 1] to capture (Price, Ticker) structure
                 comp_df = pd.read_csv(comp_path,
                                       index_col=0,
                                       header=[0, 1],
                                       parse_dates=True
                                       )
                 comp_df.index = pd.to_datetime(comp_df.index, errors="coerce")
-                comp_df = comp_df[comp_df.index.notna()]
+
+                # FIX: Sort index immediately
+                comp_df = comp_df.sort_index()
                 comp_df = comp_df[~comp_df.index.duplicated(keep="first")]
+
                 if comp_df.empty:
                     print(f"{market_name}: no existing component data, skipping.")
                     continue
@@ -133,48 +183,85 @@ def update_databases(config, fileloc):
                 print(f"----------------- {market_name} last row before update--------------------")
                 print(comp_df.tail(1))
 
-                last_existing = comp_df.index[-1].date()
-                requested_last_date = datetime.strptime(last_date_to_download, "%Y-%m-%d").date()
-                if  last_existing >= requested_last_date:
-                    print(f"-------------------- {market_name} already up-to-date -------------------------")
+                # --- NEW LOGIC: FIND LAST VALID DATE (NOT NaN ACROSS ALL TICKERS) ---
+                start_update_here = config.yf_start_date  # Default to start
+                last_existing_date = None
 
-                else:
-                    tickers = comp_df.columns.get_level_values(1).unique().tolist()
-                    start_update_here = (last_existing + timedelta(days=1)).strftime("%Y-%m-%d")
+                if not comp_df.empty and isinstance(comp_df.columns, pd.MultiIndex):
+                    # 1. Select all 'Adj Close' columns
+                    # We look for 'Adj Close' because that's the canonical price data.
+                    try:
+                        adj_close_df = comp_df.xs('Adj Close', level=0, axis=1, drop_level=False)
+                    except KeyError:
+                        # Fallback if 'Adj Close' is missing, maybe just use 'Close'
+                        adj_close_df = comp_df.xs('Close', level=0, axis=1, drop_level=False)
 
-                    print(f"Updating {market_name} ({len(tickers)} tickers)")
+                    # 2. Find rows where AT LEAST ONE 'Adj Close' value is not NaN (most recent trading day)
+                    valid_rows = adj_close_df.notna().any(axis=1)
 
-                    comp_new_data = yf.download(tickers,
-                                          start=start_update_here,
-                                          end=last_yahoo_date_to_download,
-                                          group_by="ticker",
-                                          progress=False,
-                                          rounding=True,
-                                          auto_adjust=False,
-                                          actions=True)
+                    if valid_rows.any():
+                        # 3. Get the last index where valid_rows is True
+                        last_valid_idx = valid_rows[valid_rows].index[-1]
+                        last_existing_date = last_valid_idx.date()
 
-                    if comp_new_data.empty:
-                        print(f"--------- No missing component data for {market_name} ----------------")
+                        # 4. Start updating FROM the last valid date (overlap)
+                        start_update_here = last_valid_idx.strftime("%Y-%m-%d")
                     else:
-                        comp_new_data.index = pd.to_datetime(comp_new_data.index, errors="coerce")
-                        updated = pd.concat([comp_df, comp_new_data], axis=0)
-                        updated = updated[~updated.index.duplicated(keep="first")].sort_index()
+                        # If no valid data in 'Adj Close' (unlikely for existing DB)
+                        pass
+
+                        # Check for skipping download
+                if last_existing_date is not None:
+                    if last_existing_date >= requested_last_date:
+                        print(
+                            f"-------------------- {market_name} already up-to-date with requested end date ({requested_last_date}) -------------------------")
+                        if market_name == market_name_to_study:
+                            components_to_study_df = comp_df
+                        continue
+
+                    if last_existing_date >= last_yahoo_end_date:
+                        print(
+                            f"-------------------- {market_name} already up-to-date with Yahoo end date ({last_yahoo_end_date}) -------------------------")
+                        if market_name == market_name_to_study:
+                            components_to_study_df = comp_df
+                        continue
+
+                tickers = comp_df.columns.get_level_values(1).unique().tolist()
+                print(f"Updating {market_name} ({len(tickers)} tickers) from {start_update_here}")
+
+                # FIX: Removed group_by="ticker" to match create_databases column structure (Price Type, Ticker)
+                comp_new_data = yf.download(tickers,
+                                            start=start_update_here,
+                                            end=last_yahoo_date_to_download,
+                                            progress=False,
+                                            rounding=True,
+                                            auto_adjust=False,
+                                            actions=True)
+
+                if comp_new_data.empty:
+                    print(f"--------- No missing component data for {market_name} ----------------")
+                else:
+                    comp_new_data.index = pd.to_datetime(comp_new_data.index, errors="coerce")
+
+                    # --- ROBUST CONCATENATION LOGIC: New data overwrites old data on overlap ---
+                    updated = pd.concat([comp_df, comp_new_data], axis=0)
+                    updated = updated.sort_index()
+                    # Crucial: Drop duplicates, keeping the *last* one (which is from comp_new_data, refreshing the row)
+                    updated = updated[~updated.index.duplicated(keep="last")]
+
+                    # Filter to requested final date (config.download_end_date)
+                    updated = updated[updated.index.date <= requested_last_date]
+
+                    if not updated.equals(comp_df):  # Check if any change occurred
                         updated.to_csv(comp_path)
                         print(f"----------- ✔ Components updated: {comp_path} ----------------")
+                        # Update reference for return
+                        comp_df = updated
+                    else:
+                        print(f"----------- No new unique data found for {market_name} ----------------")
 
                 if market_name == market_name_to_study:
-                    components_to_study_df = pd.read_csv(comp_path,
-                                                         index_col=0,
-                                                         header=[0, 1],
-                                                         parse_dates=True
-                                                         )
-                    components_to_study_df.index = pd.to_datetime(
-                        components_to_study_df.index,
-                        errors="coerce"
-                    )
-                    components_to_study_df = (
-                        components_to_study_df)[~components_to_study_df.index.duplicated(keep="first")
-                    ]
+                    components_to_study_df = comp_df
 
             except FileNotFoundError:
                 print(f"❌ Component file missing: {comp_path}. Skipping.")
@@ -186,39 +273,6 @@ def update_databases(config, fileloc):
     # --- CALL THEM HERE ---
     index_df = update_indexes()
     components_df = update_component_csvs()
-
-    """# ----------------------------------------------------------
-    #   DOWNLOAD SELIC + IPCA FROM BCB FOR SAME DATE RANGE
-    # ----------------------------------------------------------
-    print("\n***************************************************************")
-    print("--------------- Updating SELIC / IPCA (BCB) data --------------")
-    print("***************************************************************\n")
-
-    # Convert YYYY-mm-dd → dd/mm/YYYY
-    def _to_ddmmyyyy(s):
-        if '/' in s:
-            return s  # already dd/mm/yyyy
-        yyyy, mm, dd = s.split('-')
-        return f"{dd}/{mm}/{yyyy}"
-
-    start_bcb = _to_ddmmyyyy(config.yf_start_date)
-    end_bcb   = _to_ddmmyyyy(config.yf_end_date)
-
-    # config.bcb_series was added to your Config class:
-    #  {"ipca":433, "selic":4390}
-    series_map = {
-        config.bcb_series["ipca"]: "IPCA",
-        config.bcb_series["selic"]: "SELIC"
-    }
-
-    create_or_update_bcb_database(
-        fileloc_bacen_downloaded_data_folder=fileloc.bacen_downloaded_data_folder,
-        yf_start_date=config.yf_start_date,
-        yf_end_date=config.yf_end_date,
-        series_map=bcb_series_catalog,  #sbcb_default_series,  # or another series_map if you want more series
-        filename="BCB_IPCA_SELIC.csv",
-        use_subfolder=False
-    )"""
 
     # --- Ensure 'Adj Close' exists in returned dataframes ---
     def _ensure_adj_close_index(df):
@@ -236,10 +290,12 @@ def update_databases(config, fileloc):
         if isinstance(df.columns, pd.MultiIndex):
             fields = df.columns.get_level_values(0).unique()
             tickers = df.columns.get_level_values(1).unique()
+            # Ensure 'Adj Close' exists for every ticker if 'Close' does
             for t in tickers:
+                # Use .loc to avoid SettingWithCopyWarning
                 if ("Adj Close", t) not in df.columns and ("Close", t) in df.columns:
-                    df[("Adj Close", t)] = df[("Close", t)]
-            # sort columns for consistent order
+                    df.loc[:, ("Adj Close", t)] = df.loc[:, ("Close", t)]
+                    # Sort columns for consistent order, otherwise multiindex creation might be scrambled
             df = df.sort_index(axis=1)
         else:
             if "Adj Close" not in df.columns and "Close" in df.columns:
