@@ -154,6 +154,7 @@ def main():
     #-------------------
     # 3: BVSP vs Indexes
     #-------------------
+
     import plotting.plot_bvsp_vs_indexes as ppbi
     figs = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
     #for fig in figs:
