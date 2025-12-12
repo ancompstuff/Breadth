@@ -22,8 +22,8 @@ def forward_fill_bcb_to_daily(df_bcb, target_index):
     df = df_bcb.copy()
     df.index = pd.to_datetime(df.index, errors='coerce')
 
-    # Forward-fill onto the daily index
-    return df.reindex(target_index, method='ffill')
+    # Forward-fill onto the daily index (using ffill() instead of deprecated method parameter)
+    return df.reindex(target_index).ffill()
 
 
 # ------------------------------------------------------------------------

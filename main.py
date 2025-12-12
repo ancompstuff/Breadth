@@ -144,23 +144,23 @@ def main():
         )
         usd_series_bcb = pd.Series(merged["val"].values, index=tgt).ffill()
 
-    # g) Plot grid
-    figs = plot_bcb_grid(
+    # g) Plot grid (display only once, save to PDF later)
+    figs_bcb = plot_bcb_grid(
         ps_long_lookback,
         df_bcb_daily,
         usd_series=usd_series_bcb,
         nrows=3,
         ncols=2,
     )
-    #for fig in figs:
+    #for fig in figs_bcb:
     #    fig.show()
 
     #-------------------
     # 3: BVSP vs Indexes
     #-------------------
     import plotting.plot_bvsp_vs_indexes as ppbi
-    figs = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
-    #for fig in figs:
+    figs_bvsp = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
+    #for fig in figs_bvsp:
     #    fig.show()
     #plt.show()
 
@@ -172,26 +172,17 @@ def main():
     pdf_filename = f"{ps.mkt} breadth_{datetime.today().strftime('%Y-%m-%d')}.pdf"
     pdf_path = os.path.join(fileloc.pdf_folder, pdf_filename)
 
-    # Open the PDF file to save plots
+    # Open the PDF file to save plots (reuse already-generated figures)
     with PdfPages(pdf_path) as pdf:
 
-        fig = plot_close_vol_obv(ps, out_df)
         pdf.savefig(fig1)
         plt.close(fig1)
 
-        figs = plot_bcb_grid(
-            ps_long_lookback,
-            df_bcb_daily,
-            usd_series=usd_series_bcb,
-            nrows=3,
-            ncols=2,
-        )
-        for fig in figs:
+        for fig in figs_bcb:
             pdf.savefig(fig)
             plt.close(fig)
 
-        figs = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
-        for f in figs:
+        for f in figs_bvsp:
             pdf.savefig(f)
             plt.close(f)
 
