@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from core.my_data_types import PlotSetup
-from core.bcb_config import BCB_SHORT_BY_LONG
+from core.bcb_config import BCB_SGS_SERIES, BCB_SHORT_BY_LONG
+
 
 def plot_bcb_grid(
         ps: PlotSetup,    df_bcb_daily: pd.DataFrame,
@@ -28,7 +29,8 @@ def plot_bcb_grid(
         usd_vals = None
 
     # Exclude BCB USD series (we use Yahoo USD)
-    usd_col_full = "BRL/USD Exchange Rate – End of period (commercial rate)"
+    USD_SGS_CODE = 1
+    usd_col_full = BCB_SGS_SERIES[USD_SGS_CODE]["full_name"]
     series_names = [c for c in df_bcb_sample.columns if c != usd_col_full]
     total_series = len(series_names)
     if total_series == 0:
@@ -40,16 +42,6 @@ def plot_bcb_grid(
     # Left axis limits from IBOV only
     left_min = adj.min()
     left_max = adj.max()
-
-    """# Sparse tick positions
-    full_positions = ps.tick_positions
-    if not full_positions:
-        sparse_positions = []
-    else:
-        sparse_positions = sorted(set(full_positions[::5] + [full_positions[-1]]))
-
-    # Pre-build x-axis label text
-    xlabels = [ps.date_labels[j] for j in sparse_positions]"""
 
     # Sparse tick positions and labels (match BCB grid)
     full_positions = ps.tick_positions
@@ -125,16 +117,16 @@ def plot_bcb_grid(
                 else:
                     usd_plot = usd_vals * 0.0 + (left_min + left_max) / 2.0
 
-                ax_left.plot(x, usd_plot, color="green", linewidth=1.0, label="BRL=X")
-                ax_left.fill_between(x, usd_plot, color="green", alpha=0.15)
+                ax_left.plot(x, usd_plot, color="green", linewidth=0.6, label="BRL=X")
+                ax_left.fill_between(x, usd_plot, color="green", alpha=0.05)
 
             # Right axis — one BCB series
             ax_right = ax_left.twinx()
             ax_right.plot(
                 x,
                 df_bcb_sample[col].values,
-                linewidth=1.2,
-                color="tab:blue",
+                linewidth=2,
+                color="tab:orange",
                 label=short,
             )
             ax_right.set_ylabel(short, fontsize=8)

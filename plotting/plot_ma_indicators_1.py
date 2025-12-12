@@ -217,11 +217,15 @@ def plot_absolute_compression_bands(idx_ma_df: pd.DataFrame,
         band_upper[group_name] = upper
         band_lower[group_name] = lower
 
+        alpha_val = 0.30
+        if group_name == "short":
+            alpha_val = 0.80
+
         ax_band.fill_between(
             ps.plot_index,
             lower,
             upper,
-            alpha=0.30,
+            alpha=alpha_val,
             color=color,
             label=f"{group_name} band"
         )

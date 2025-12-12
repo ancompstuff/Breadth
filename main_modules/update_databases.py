@@ -1,9 +1,8 @@
 import os
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 from core.constants import yahoo_market_details
-from main_modules.bcb_data import create_or_update_bcb_database
 
 
 # ======================================================================

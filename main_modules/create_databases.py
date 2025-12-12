@@ -2,10 +2,8 @@ import os
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
-from main_modules.bcb_data import create_or_update_bcb_database
-from core.constants import file_locations, yahoo_market_details, bcb_default_series, bcb_series_catalog
-import time
-from pathlib import Path
+from core.constants import file_locations, yahoo_market_details
+
 
 def create_databases(config, fileloc):
     """
@@ -169,8 +167,7 @@ def create_databases(config, fileloc):
 ##################################################################################################
 
 if __name__ == "__main__":
-    from pathlib import Path
-    from core.my_data_types import load_file_locations_dict, Config, FileLocations
+    from core.my_data_types import load_file_locations_dict, Config
 
     fileloc = load_file_locations_dict(file_locations)
 

@@ -97,56 +97,52 @@ def main():
     fig1 = plot_close_vol_obv(ps, out_df)
     #plt.show()
 
-    """# IBOV vs USD + SELIC + IPCA (uses get_idx1_idx2 → BCB_IPCA_SELIC.csv)
-    from plotting.plot_idx1_v_idx2 import plot_idx1_v_idx2
-    idx1 = "^BVSP"
-    idx2 = "BRL=X"
-    fig2 = plot_idx1_v_idx2(idx1, idx2, config, fileloc, ps)
-    plt.show()"""
-
-    #-------------------------------------------
+    # -------------------------------------------
     # 2: BCB vs IBOV – grid of single-BCB charts
-    #-------------------------------------------
-    from indicators.bcb_align import forward_fill_bcb_to_daily
-    from indicators.get_idx1_idx2 import get_idx1_idx2
+    # -------------------------------------------
+    from utils.load_usd_from_files import load_usd_series
     from plotting.plot_bcb_grid import plot_bcb_grid
 
-    # a) Load BCB monthly data
-    bcb_monthly_path = os.path.join(
+    # a) Prefer TRADING-ALIGNED file if it exists
+    bcb_ready_trading_path = os.path.join(
         fileloc.bacen_downloaded_data_folder,
-        "bcb_dashboard_monthly.csv",
+        "bcb_dashboard_ready_trading.csv",
     )
-    df_bcb = pd.read_csv(bcb_monthly_path, index_col="date", parse_dates=True)
+    bcb_ready_path = os.path.join(
+        fileloc.bacen_downloaded_data_folder,
+        "bcb_dashboard_ready.csv",
+    )
 
-    # b) Convert BCB data to DAILY using IBOV calendar (ps_long_lookback)
-    df_bcb_daily = forward_fill_bcb_to_daily(df_bcb, ps_long_lookback.price_data.index)
+    if os.path.exists(bcb_ready_trading_path):
+        print("[BCB] Using trading-aligned ready file.")
+        df_bcb = pd.read_csv(bcb_ready_trading_path, index_col="date", parse_dates=True)
+    else:
+        print("[BCB] Using calendar ready file.")
+        df_bcb = pd.read_csv(bcb_ready_path, index_col="date", parse_dates=True)
 
-    # c) IBOV + USD with doubled lookback (config_bcb)
-    idx1 = "^BVSP"
-    idx2 = "BRL=X"
-    df_idx_usd_bcb = get_idx1_idx2(idx1, idx2, config_bcb, fileloc, ps_long_lookback)
-    df_idx_usd_bcb.index = pd.to_datetime(df_idx_usd_bcb.index)
-
-    # d) USD aligned to ps_long_lookback price index
-    src = df_idx_usd_bcb[idx2].sort_index()
+    # b) Ensure BCB is aligned to trading calendar
     tgt = ps_long_lookback.price_data.index
+    df_bcb_daily = df_bcb.reindex(tgt).ffill()
 
-    # e) First pass: reindex + ffill
-    usd_series_bcb = src.reindex(tgt).ffill()
+    # c) Load USD from local CSV
+    usd_raw = load_usd_series(fileloc)
 
-    # f) If still contains NaNs (rare), use merge_asof
+    # d) Align USD to trading calendar
+    usd_series_bcb = usd_raw.reindex(tgt).ffill()
+
+    # (Optional): merge_asof safety repair
     if usd_series_bcb.isna().any():
         left = pd.DataFrame({"t": tgt})
-        right = src.reset_index().rename(columns={"index": "t", idx2: "val"})
+        right = usd_raw.reset_index().rename(columns={"index": "t", usd_raw.name: "val"})
         merged = pd.merge_asof(
             left.sort_values("t"),
             right.sort_values("t"),
             on="t",
-            direction="backward"
+            direction="backward",
         )
         usd_series_bcb = pd.Series(merged["val"].values, index=tgt).ffill()
 
-    # g) Plot grid
+    # e) Plot grid
     figs = plot_bcb_grid(
         ps_long_lookback,
         df_bcb_daily,
@@ -154,8 +150,6 @@ def main():
         nrows=3,
         ncols=2,
     )
-    #for fig in figs:
-    #    fig.show()
 
     #-------------------
     # 3: BVSP vs Indexes

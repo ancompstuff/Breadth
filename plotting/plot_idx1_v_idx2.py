@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
 import pandas as pd
 
-from indicators.get_idx1_idx2 import get_idx1_idx2
+from junk.get_idx1_idx2 import get_idx1_idx2
 
 
 def plot_idx1_v_idx2(idx1, idx2, config, fileloc, plot_setup):

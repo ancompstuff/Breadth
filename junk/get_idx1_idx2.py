@@ -2,7 +2,7 @@
 
 import os
 import pandas as pd
-from .bcb_align import selic_vs_index_df, ipca_vs_index_df
+from indicators.bcb_align import selic_vs_index_df, ipca_vs_index_df
 
 
 def get_idx1_idx2(idx1, idx2, config, fileloc, plot_setup):
