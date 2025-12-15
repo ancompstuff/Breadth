@@ -6,6 +6,133 @@ from core.constants import yahoo_market_details
 
 
 # ======================================================================
+#   HELPER FUNCTIONS FOR EFFICIENCY
+# ======================================================================
+
+def _parse_dates_once(download_end_date, yf_end_date):
+    """Parse date strings once and reuse throughout the function."""
+    requested_last_date = datetime.strptime(download_end_date, "%Y-%m-%d").date()
+    last_yahoo_end_date = datetime.strptime(yf_end_date, "%Y-%m-%d").date()
+    return requested_last_date, last_yahoo_end_date
+
+
+def _clean_dataframe(df):
+    """Consolidate DataFrame cleaning operations.
+    
+    Note: Creates a copy to avoid modifying the original DataFrame.
+    """
+    # Create a copy to avoid side effects
+    df = df.copy()
+    if df.empty:
+        return df
+    df.index = pd.to_datetime(df.index, errors="coerce")
+    df = df.sort_index()
+    df = df[~df.index.duplicated(keep="first")]
+    return df
+
+
+def _find_last_valid_date(df, column_priority=None):
+    """Find the last valid (non-NaN) date in a DataFrame efficiently."""
+    if df is None or df.empty:
+        return None
+    
+    if column_priority is None:
+        column_priority = ['Adj Close', 'Close']
+    
+    for col in column_priority:
+        if col in df.columns:
+            last_valid_idx = df[col].last_valid_index()
+            if last_valid_idx is not None:
+                return last_valid_idx.date()
+    return None
+
+
+def _find_last_valid_date_multiindex(df):
+    """Find the last valid date for MultiIndex DataFrame (components)."""
+    if df is None or df.empty or not isinstance(df.columns, pd.MultiIndex):
+        return None
+    
+    try:
+        adj_close_df = df.xs('Adj Close', level=0, axis=1, drop_level=False)
+    except KeyError:
+        try:
+            adj_close_df = df.xs('Close', level=0, axis=1, drop_level=False)
+        except KeyError:
+            return None
+    
+    valid_rows = adj_close_df.notna().any(axis=1)
+    if valid_rows.any():
+        return valid_rows[valid_rows].index[-1].date()
+    return None
+
+
+def _should_skip_update(last_existing_date, requested_last_date, last_yahoo_end_date):
+    """Check if update should be skipped based on existing data dates.
+    
+    Updates are skipped when the existing data already covers the requested time period.
+    This happens when:
+    - The last valid data date >= requested end date (we already have all requested data)
+    - OR the last valid data date >= Yahoo Finance end date (API won't return newer data)
+    
+    Args:
+        last_existing_date: Last valid date in the existing dataset
+        requested_last_date: User's requested end date for the dataset
+        last_yahoo_end_date: End date for Yahoo Finance API calls (often requested_date + 1)
+    
+    Returns:
+        bool: True if update should be skipped, False otherwise
+    """
+    if last_existing_date is None:
+        return False
+    return (last_existing_date >= requested_last_date or 
+            last_existing_date >= last_yahoo_end_date)
+
+
+def _merge_and_update_data(old_df, new_data, requested_last_date):
+    """Merge old and new data efficiently, handling overlaps.
+    
+    This function combines existing data with newly downloaded data, ensuring that
+    newer data overwrites older data for overlapping dates. It also filters the
+    result to only include dates up to the requested end date.
+    
+    Args:
+        old_df: Existing DataFrame with historical data
+        new_data: Newly downloaded DataFrame to merge with existing data
+        requested_last_date: Latest date to include in the final dataset (date object)
+    
+    Returns:
+        tuple: (updated_df, changed) where:
+            - updated_df: Merged and filtered DataFrame
+            - changed: True if data was modified, False otherwise
+    """
+    # Create a copy to avoid modifying the original new_data
+    new_data = new_data.copy()
+    
+    # Clean new data first
+    new_data.index = pd.to_datetime(new_data.index, errors="coerce")
+    
+    # Handle MultiIndex columns for single ticker downloads
+    if isinstance(new_data.columns, pd.MultiIndex):
+        new_data = new_data.droplevel(1, axis=1)
+    
+    # Check if new data is empty after cleaning
+    if new_data.empty:
+        return old_df, False
+    
+    # Merge: new data overwrites old on overlap
+    updated = pd.concat([old_df, new_data])
+    updated = updated.sort_index()
+    updated = updated[~updated.index.duplicated(keep="last")]
+    
+    # Filter to requested end date
+    updated = updated[updated.index.date <= requested_last_date]
+    
+    # Check if any change occurred
+    changed = not updated.equals(old_df)
+    return updated, changed
+
+
+# ======================================================================
 #   UPDATE INDEX + COMPONENTS USING NEW CONFIG + FILELOC STRUCTURE
 # ======================================================================
 
@@ -30,9 +157,10 @@ def update_databases(config, fileloc):
     idx_code_to_study = market_to_study_dict_values["idx_code"]
     market_name_to_study = market_to_study_dict_values["market"]
 
-    last_date_to_download = config.download_end_date
-    # config.yf_end_date is often T+1, providing the final date for the yfinance API call
-    last_yahoo_date_to_download = config.yf_end_date
+    # Parse dates once at the beginning
+    requested_last_date, last_yahoo_end_date = _parse_dates_once(
+        config.download_end_date, config.yf_end_date
+    )
 
     # -----------------------
     def update_indexes():
@@ -42,8 +170,6 @@ def update_databases(config, fileloc):
         print("****************************************************************************\n")
 
         index_to_study_df = None
-        requested_last_date = datetime.strptime(last_date_to_download, "%Y-%m-%d").date()
-        last_yahoo_end_date = datetime.strptime(last_yahoo_date_to_download, "%Y-%m-%d").date()
 
         for key, info in yahoo_market_details.items():
             idx_code = info["idx_code"]
@@ -51,10 +177,7 @@ def update_databases(config, fileloc):
 
             try:
                 df = pd.read_csv(idx_path, index_col=0, parse_dates=True)
-                df.index = pd.to_datetime(df.index, errors="coerce")
-                # Ensure data is sorted
-                df = df.sort_index()
-                df = df[~df.index.duplicated(keep="first")]
+                df = _clean_dataframe(df)
 
                 print(f"-------------------- {idx_code} Last row before update -------------------------")
                 print(df.tail(1))
@@ -63,80 +186,46 @@ def update_databases(config, fileloc):
                 if not df.empty and "Volume" in df.columns and df["Volume"].iloc[-1] == 0:
                     df = df.iloc[:-1]
 
-                # --- NEW LOGIC: FIND LAST VALID DATE (NOT NaN) ---
-                start_update = config.yf_start_date  # Default to start
-                last_existing_date = None
-
-                if not df.empty:
-                    # Look for the last non-NaN date in the 'Close' or 'Adj Close' column
-                    cols_to_check = ['Adj Close', 'Close']
-                    last_valid_idx = None
-                    for col in cols_to_check:
-                        if col in df.columns:
-                            last_valid_idx = df[col].last_valid_index()
-                            if last_valid_idx is not None:
-                                break
-
-                    if last_valid_idx is not None:
-                        last_existing_date = last_valid_idx.date()
-                        # Start updating FROM the last valid date (overlap) to ensure continuity
-                        start_update = last_valid_idx.strftime("%Y-%m-%d")
-
+                # Find last valid date efficiently
+                last_existing_date = _find_last_valid_date(df)
+                
+                # Determine start update date
+                start_update = config.yf_start_date
                 if last_existing_date is not None:
-                    # Skip only if the last *valid* date in the file covers the requested end date
+                    start_update = last_existing_date.strftime("%Y-%m-%d")
+
+                # Check if update should be skipped
+                if _should_skip_update(last_existing_date, requested_last_date, last_yahoo_end_date):
                     if last_existing_date >= requested_last_date:
-                        print(
-                            f"-------------------- {idx_code} already up-to-date with requested end date ({requested_last_date}) -------------------------")
-                        if idx_code == idx_code_to_study:
-                            index_to_study_df = df
-                        continue
+                        print(f"-------------------- {idx_code} already up-to-date with requested end date ({requested_last_date}) -------------------------")
+                    else:
+                        print(f"-------------------- {idx_code} already up-to-date with Yahoo end date ({last_yahoo_end_date}) -------------------------")
+                    if idx_code == idx_code_to_study:
+                        index_to_study_df = df
+                    continue
 
-                        # Also skip if the file date is already >= the YF end date
-                    if last_existing_date >= last_yahoo_end_date:
-                        print(
-                            f"-------------------- {idx_code} already up-to-date with Yahoo end date ({last_yahoo_end_date}) -------------------------")
-                        if idx_code == idx_code_to_study:
-                            index_to_study_df = df
-                        continue
-
-                print(f"Updating {idx_code} from {start_update} to {last_yahoo_date_to_download}")
+                print(f"Updating {idx_code} from {start_update} to {config.yf_end_date}")
 
                 new_data = yf.download(idx_code,
                                        start=start_update,
-                                       end=last_yahoo_date_to_download,
+                                       end=config.yf_end_date,
                                        progress=False,
                                        rounding=True,
                                        auto_adjust=False,
                                        multi_level_index=False
                                        )
 
-                if not new_data.empty:
-                    # Clean up columns if single ticker download returned MultiIndex
-                    if isinstance(new_data.columns, pd.MultiIndex):
-                        new_data = new_data.droplevel(1, axis=1)
-
-                    new_data.index = pd.to_datetime(new_data.index, errors="coerce")
-
-                    # --- ROBUST CONCATENATION LOGIC: New data overwrites old data on overlap ---
-                    updated = pd.concat([df, new_data])
-                    updated = updated.sort_index()
-                    # Crucial: Drop duplicates, keeping the *last* one (which is from new_data, refreshing the row)
-                    updated = updated[~updated.index.duplicated(keep="last")]
-
-                    # Filter to the requested end date
-                    updated = updated[updated.index.date <= requested_last_date]
-
-                    if not updated.equals(df):  # Check if any change occurred
-                        updated.to_csv(idx_path)
-                        print(f"----------------- ✔ Saved updated index: {idx_path} -------------")
-                        # Refresh df reference for return
-                        df = updated
-                    else:
-                        print(f"-------------- No new unique index data for {idx_code} ---------------")
+                updated, changed = _merge_and_update_data(df, new_data, requested_last_date)
+                
+                if changed:
+                    updated.to_csv(idx_path)
+                    print(f"----------------- ✔ Saved updated index: {idx_path} -------------")
+                    df = updated
                 else:
-                    print(f"-------------- No new index data for {idx_code} ---------------")
+                    # No changes means either no new data or no unique data after merge
+                    print(f"-------------- No new data to update for {idx_code} ---------------")
 
-                # If this is the market being studied → reload/assign for return
+                # If this is the market being studied → assign for return
                 if idx_code == idx_code_to_study:
                     index_to_study_df = df
 
@@ -154,8 +243,6 @@ def update_databases(config, fileloc):
         print("--------------------- Updating requested component file(s) ------------------------")
         print("*********************************************************************************\n")
         components_to_study_df = None
-        requested_last_date = datetime.strptime(last_date_to_download, "%Y-%m-%d").date()
-        last_yahoo_end_date = datetime.strptime(last_yahoo_date_to_download, "%Y-%m-%d").date()
 
         for key, info in config.to_update.items():
             market_name = info["market"]
@@ -168,11 +255,7 @@ def update_databases(config, fileloc):
                                       header=[0, 1],
                                       parse_dates=True
                                       )
-                comp_df.index = pd.to_datetime(comp_df.index, errors="coerce")
-
-                # FIX: Sort index immediately
-                comp_df = comp_df.sort_index()
-                comp_df = comp_df[~comp_df.index.duplicated(keep="first")]
+                comp_df = _clean_dataframe(comp_df)
 
                 if comp_df.empty:
                     print(f"{market_name}: no existing component data, skipping.")
@@ -181,56 +264,30 @@ def update_databases(config, fileloc):
                 print(f"----------------- {market_name} last row before update--------------------")
                 print(comp_df.tail(1))
 
-                # --- NEW LOGIC: FIND LAST VALID DATE (NOT NaN ACROSS ALL TICKERS) ---
-                start_update_here = config.yf_start_date  # Default to start
-                last_existing_date = None
-
-                if not comp_df.empty and isinstance(comp_df.columns, pd.MultiIndex):
-                    # 1. Select all 'Adj Close' columns
-                    # We look for 'Adj Close' because that's the canonical price data.
-                    try:
-                        adj_close_df = comp_df.xs('Adj Close', level=0, axis=1, drop_level=False)
-                    except KeyError:
-                        # Fallback if 'Adj Close' is missing, maybe just use 'Close'
-                        adj_close_df = comp_df.xs('Close', level=0, axis=1, drop_level=False)
-
-                    # 2. Find rows where AT LEAST ONE 'Adj Close' value is not NaN (most recent trading day)
-                    valid_rows = adj_close_df.notna().any(axis=1)
-
-                    if valid_rows.any():
-                        # 3. Get the last index where valid_rows is True
-                        last_valid_idx = valid_rows[valid_rows].index[-1]
-                        last_existing_date = last_valid_idx.date()
-
-                        # 4. Start updating FROM the last valid date (overlap)
-                        start_update_here = last_valid_idx.strftime("%Y-%m-%d")
-                    else:
-                        # If no valid data in 'Adj Close' (unlikely for existing DB)
-                        pass
-
-                        # Check for skipping download
+                # Find last valid date efficiently
+                last_existing_date = _find_last_valid_date_multiindex(comp_df)
+                
+                # Determine start update date
+                start_update_here = config.yf_start_date
                 if last_existing_date is not None:
-                    if last_existing_date >= requested_last_date:
-                        print(
-                            f"-------------------- {market_name} already up-to-date with requested end date ({requested_last_date}) -------------------------")
-                        if market_name == market_name_to_study:
-                            components_to_study_df = comp_df
-                        continue
+                    start_update_here = last_existing_date.strftime("%Y-%m-%d")
 
-                    if last_existing_date >= last_yahoo_end_date:
-                        print(
-                            f"-------------------- {market_name} already up-to-date with Yahoo end date ({last_yahoo_end_date}) -------------------------")
-                        if market_name == market_name_to_study:
-                            components_to_study_df = comp_df
-                        continue
+                # Check if update should be skipped
+                if _should_skip_update(last_existing_date, requested_last_date, last_yahoo_end_date):
+                    if last_existing_date >= requested_last_date:
+                        print(f"-------------------- {market_name} already up-to-date with requested end date ({requested_last_date}) -------------------------")
+                    else:
+                        print(f"-------------------- {market_name} already up-to-date with Yahoo end date ({last_yahoo_end_date}) -------------------------")
+                    if market_name == market_name_to_study:
+                        components_to_study_df = comp_df
+                    continue
 
                 tickers = comp_df.columns.get_level_values(1).unique().tolist()
                 print(f"Updating {market_name} ({len(tickers)} tickers) from {start_update_here}")
 
-                # FIX: Removed group_by="ticker" to match create_databases column structure (Price Type, Ticker)
                 comp_new_data = yf.download(tickers,
                                             start=start_update_here,
-                                            end=last_yahoo_date_to_download,
+                                            end=config.yf_end_date,
                                             progress=False,
                                             rounding=True,
                                             auto_adjust=False,
@@ -239,21 +296,12 @@ def update_databases(config, fileloc):
                 if comp_new_data.empty:
                     print(f"--------- No missing component data for {market_name} ----------------")
                 else:
-                    comp_new_data.index = pd.to_datetime(comp_new_data.index, errors="coerce")
-
-                    # --- ROBUST CONCATENATION LOGIC: New data overwrites old data on overlap ---
-                    updated = pd.concat([comp_df, comp_new_data], axis=0)
-                    updated = updated.sort_index()
-                    # Crucial: Drop duplicates, keeping the *last* one (which is from comp_new_data, refreshing the row)
-                    updated = updated[~updated.index.duplicated(keep="last")]
-
-                    # Filter to requested final date (config.download_end_date)
-                    updated = updated[updated.index.date <= requested_last_date]
-
-                    if not updated.equals(comp_df):  # Check if any change occurred
+                    # Use the same merge logic as indexes for consistency
+                    updated, changed = _merge_and_update_data(comp_df, comp_new_data, requested_last_date)
+                    
+                    if changed:
                         updated.to_csv(comp_path)
                         print(f"----------- ✔ Components updated: {comp_path} ----------------")
-                        # Update reference for return
                         comp_df = updated
                     else:
                         print(f"----------- No new unique data found for {market_name} ----------------")
