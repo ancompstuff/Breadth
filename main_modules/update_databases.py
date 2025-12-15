@@ -67,7 +67,21 @@ def _find_last_valid_date_multiindex(df):
 
 
 def _should_skip_update(last_existing_date, requested_last_date, last_yahoo_end_date):
-    """Check if update should be skipped based on existing data dates."""
+    """Check if update should be skipped based on existing data dates.
+    
+    Updates are skipped when the existing data already covers the requested time period.
+    This happens when:
+    - The last valid data date >= requested end date (we already have all requested data)
+    - OR the last valid data date >= Yahoo Finance end date (API won't return newer data)
+    
+    Args:
+        last_existing_date: Last valid date in the existing dataset
+        requested_last_date: User's requested end date for the dataset
+        last_yahoo_end_date: End date for Yahoo Finance API calls (often requested_date + 1)
+    
+    Returns:
+        bool: True if update should be skipped, False otherwise
+    """
     if last_existing_date is None:
         return False
     return (last_existing_date >= requested_last_date or 
@@ -271,19 +285,10 @@ def update_databases(config, fileloc):
                 if comp_new_data.empty:
                     print(f"--------- No missing component data for {market_name} ----------------")
                 else:
-                    # Clean new data (creates a copy internally)
-                    comp_new_data = comp_new_data.copy()
-                    comp_new_data.index = pd.to_datetime(comp_new_data.index, errors="coerce")
-
-                    # Merge: new data overwrites old data on overlap
-                    updated = pd.concat([comp_df, comp_new_data], axis=0)
-                    updated = updated.sort_index()
-                    updated = updated[~updated.index.duplicated(keep="last")]
-
-                    # Filter to requested final date
-                    updated = updated[updated.index.date <= requested_last_date]
-
-                    if not updated.equals(comp_df):
+                    # Use the same merge logic as indexes for consistency
+                    updated, changed = _merge_and_update_data(comp_df, comp_new_data, requested_last_date)
+                    
+                    if changed:
                         updated.to_csv(comp_path)
                         print(f"----------- ✔ Components updated: {comp_path} ----------------")
                         comp_df = updated
