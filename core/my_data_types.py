@@ -1,7 +1,8 @@
 from dataclasses import dataclass, asdict, field
 import matplotlib.pyplot as plt
 import pandas as pd
-from core.constants import file_locations
+from contextlib import contextmanager
+import time
 
 
 #==========================================================================================
@@ -133,6 +134,18 @@ class PlotSetup:
 
     def fix_xlimits(self, ax):
         ax.set_xlim(-0.5, len(self.plot_index) - 0.5)
+
+
+@contextmanager
+def timed_block(name: str):
+    start = time.perf_counter()
+    print(f"[START] {name}")
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+        print(f"[END]   {name} — {elapsed:.3f}s")
+
 
 #==========================================================================================
 # Other Dataclasses

@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
-from utils.build_color_map import mka_color_map
+from utils.build_color_map import build_mka_color_map
+from core.constants import ma_groups, mas_list
 
+
+mka_color_map = build_mka_color_map(ma_groups, mas_list, include_all_pairwise_and_triplets=False)
 
 def plot_vwma_percent_trends_3panels(
     ps,
@@ -24,8 +27,8 @@ def plot_vwma_percent_trends_3panels(
 
     panels = {
         "Short term":  ["VWMA5", "VWMA5&12", "VWMA5&12&25"],
-        "Medium term": ["VWMA40", "VWMA40&60", "VWMA40&60&80"],
-        "Long term":   ["VWMA50", "VWMA50&100", "VWMA50&100&200"],
+        "Medium term": ["VWMA40", "VWMA40&50", "VWMA40&50&60"],
+        "Long term":   ["VWMA80", "VWMA80&100", "VWMA80&100&200"],
     }
 
     for ax, (title, combos) in zip(axes, panels.items()):
@@ -43,7 +46,7 @@ def plot_vwma_percent_trends_3panels(
         for label in combos:
             pct_col = f"%>{label}"
 
-            ax_r.plot(
+            ax_r.bar(
                 ps.plot_index,
                 df_trends[pct_col].values,
                 color=mka_color_map[pct_col],
@@ -61,6 +64,10 @@ def plot_vwma_percent_trends_3panels(
 
         ax.grid(True, axis="y", alpha=0.3)
         ps.fix_xlimits(ax)
+
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax_r.get_legend_handles_labels()
+        ax_r.legend(lines + lines2, labels + labels2, loc='upper left', fontsize=8, frameon=True)
 
     # ------------------------------------------------------
     # X-axis formatting once (bottom)

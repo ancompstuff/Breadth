@@ -22,9 +22,14 @@ def forward_fill_bcb_to_daily(df_bcb, target_index):
     df = df_bcb.copy()
     df.index = pd.to_datetime(df.index, errors='coerce')
 
-    # Forward-fill onto the daily index
-    return df.reindex(target_index, method='ffill')
+    # Ensure proper ordering and uniqueness before reindexing
+    df = df.sort_index()
+    if not df.index.is_unique:
+        df = df[~df.index.duplicated(keep="last")]
 
+    # Forward-fill onto the daily index
+    # return df.reindex(target_index, method='ffill')  # OLD depreciated
+    return df.reindex(target_index).ffill()
 
 # ------------------------------------------------------------------------
 #   GENERIC BUILDER: any BCB column vs IBOV Adj Close

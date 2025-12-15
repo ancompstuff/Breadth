@@ -1,251 +1,239 @@
-# IMPORT FUNCTIONS
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-import numpy as np
-import pandas as pd
+# ---------------------------------------
+# Standard library
+# ---------------------------------------
 import os
 import time
-from dataclasses import replace
 from datetime import datetime
+from dataclasses import replace
 
+# ---------------------------------------
+# Third-party
+# ---------------------------------------
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+
+# ---------------------------------------
+# Project / internal imports
+# ---------------------------------------
 from core.constants import file_locations
 from core.my_data_types import load_file_locations_dict
 from main_modules.user_setup import what_do_you_want_to_do
 from main_modules.update_or_create import update_or_create_databases
 from utils.align_dataframes import align_and_prepare_for_plot
 
-#############################################
-# main.py — Central dispatcher for Structured_Breadth
-#############################################
-"""
-Responsibilities:
------------------
-1. Load file location settings from core/file_locations.json
-2. Run interactive user setup and return a Config object
-3. Dispatch to the correct action: update or create databases
-4. (Later) plot charts, generate PDFs, etc.
-"""
 
-def main():
+# ---------------------------
+# 1. Load + align market data
+# ---------------------------
 
-    #--------------------------------
-    # 1) Load the file_locations dict
-    #--------------------------------
-    fileloc = load_file_locations_dict(file_locations)
-    print("fileloc.yahoo:", fileloc.yahoo_downloaded_data_folder)
-    print("fileloc.bacen:", fileloc.bacen_downloaded_data_folder)
-    print("fileloc.pdf:", fileloc.pdf_folder)
-    print("fileloc.codes_to_download:", fileloc.codes_to_download_folder)
-
-    #----------------------------------
-    # 2) Run the full interactive setup
-    #----------------------------------
+def load_and_align_data(fileloc):
+    # 1) Main user choice
     config = what_do_you_want_to_do(fileloc)
 
-    # Update BCB data or not (monthly and takes a while)
+    # 2) Ask BCB update IMMEDIATELY after
     from utils.update_bcb_y_or_n import ask_update_bcb
     update_bcb = ask_update_bcb()
 
-    #-----------------------------------------------------------------------------
-    # 3) Execute the requested action (update DB or rebuild DBs) and align indexes
-    #-----------------------------------------------------------------------------
+    # 3) Build / update market databases
     index_df, components_df = update_or_create_databases(config, fileloc)
-    index_df, components_df = align_and_prepare_for_plot(index_df, components_df)
-    """print(f"index_df last line:\n{index_df.tail(1)}")
-       print(f'Index type: {index_df.index.dtype}')
-       print(f"components_df last line:\n{components_df.tail(1)}")
-       print(f'Index type: {components_df.index.dtype}')"""
 
-    #-----------------------
-    # 3) Build BCB files
-    #-----------------------
+    # 4) Align calendars
+    index_df, components_df = align_and_prepare_for_plot(
+        index_df, components_df
+    )
+
+    return config, update_bcb, index_df, components_df
+
+
+# -------------------------------
+# 2. Load BCB + USD macro data
+# -------------------------------
+def load_macro_data(fileloc, trading_index, update_bcb):
     if update_bcb:
         from main_modules.build_bcb_files import build_bcb_files
         build_bcb_files(fileloc)
-    else:
-        print("BCB update skipped. Using existing BCB data.")
 
-    ###################################
-    # 4) Indicator calculations
-    ###################################
-
-    # Close/Volume/OBV
-    from indicators.close_vol_obv import compute_close_vol_obv
-    out_df = compute_close_vol_obv(index_df)
-
-    ###################################
-    # 5) PlotSetup creation
-    ###################################
-    from plotting.common_plot_setup import prepare_plot_data
-
-    # 1) Normal PlotSetup
-    ps = prepare_plot_data(index_df, components_df, config)
-    #print("price_data columns:", ps.price_data.columns.tolist())
-
-    ## 2) BCB PlotSetup with 2× lookback
-    config_bcb = replace(config, graph_lookback=config.graph_lookback * 5)
-    ps_long_lookback = prepare_plot_data(index_df, components_df, config_bcb)
-
-    ###################################
-    # 6) STANDARD PLOTS
-    ###################################
-
-    #--------------------
-    # 1: Close/Volume/OBV
-    #--------------------
-    from plotting.plot_close_vol_obv import plot_close_vol_obv
-    fig1 = plot_close_vol_obv(ps, out_df)
-    #plt.show()
-
-    # -------------------------------------------
-    # 2: BCB vs IBOV – grid of single-BCB charts
-    # -------------------------------------------
-    from utils.load_usd_from_files import load_usd_series
-    from plotting.plot_bcb_grid import plot_bcb_grid
-
-    # a) Prefer TRADING-ALIGNED file if it exists
-    bcb_ready_trading_path = os.path.join(
+    # Load BCB ready file
+    trading_path = os.path.join(
         fileloc.bacen_downloaded_data_folder,
         "bcb_dashboard_ready_trading.csv",
     )
-    bcb_ready_path = os.path.join(
+    calendar_path = os.path.join(
         fileloc.bacen_downloaded_data_folder,
         "bcb_dashboard_ready.csv",
     )
 
-    if os.path.exists(bcb_ready_trading_path):
-        print("[BCB] Using trading-aligned ready file.")
-        df_bcb = pd.read_csv(bcb_ready_trading_path, index_col="date", parse_dates=True)
+    if os.path.exists(trading_path):
+        df_bcb = pd.read_csv(trading_path, index_col="date", parse_dates=True)
     else:
-        print("[BCB] Using calendar ready file.")
-        df_bcb = pd.read_csv(bcb_ready_path, index_col="date", parse_dates=True)
+        df_bcb = pd.read_csv(calendar_path, index_col="date", parse_dates=True)
 
-    # b) Ensure BCB is aligned to trading calendar
-    tgt = ps_long_lookback.price_data.index
-    df_bcb_daily = df_bcb.reindex(tgt).ffill()
+    df_bcb_daily = df_bcb.reindex(trading_index).ffill()
 
-    # c) Load USD from local CSV
+    # Load USD
+    from utils.load_usd_from_files import load_usd_series
     usd_raw = load_usd_series(fileloc)
+    usd_series = usd_raw.reindex(trading_index).ffill()
 
-    # d) Align USD to trading calendar
-    usd_series_bcb = usd_raw.reindex(tgt).ffill()
+    return df_bcb_daily, usd_series
 
-    # (Optional): merge_asof safety repair
-    if usd_series_bcb.isna().any():
-        left = pd.DataFrame({"t": tgt})
-        right = usd_raw.reset_index().rename(columns={"index": "t", usd_raw.name: "val"})
-        merged = pd.merge_asof(
-            left.sort_values("t"),
-            right.sort_values("t"),
-            on="t",
-            direction="backward",
-        )
-        usd_series_bcb = pd.Series(merged["val"].values, index=tgt).ffill()
 
-    # e) Plot grid
-    figs = plot_bcb_grid(
-        ps_long_lookback,
-        df_bcb_daily,
-        usd_series=usd_series_bcb,
-        nrows=3,
-        ncols=2,
+# ---------------------------------------
+# 3. Compute all indicators (NO plotting)
+# ---------------------------------------
+def compute_indicators(index_df, components_df, ps):
+    from indicators.close_vol_obv import compute_close_vol_obv
+    import indicators.ma_indicators_1 as mai
+    import indicators.ma_indicators_2 as mai2
+
+    out_close_vol = compute_close_vol_obv(index_df)
+
+    df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(
+        index_df, components_df
     )
 
-    #-------------------
-    # 3: BVSP vs Indexes
-    #-------------------
-
-    import plotting.plot_bvsp_vs_indexes as ppbi
-    figs = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
-    #for fig in figs:
-    #    fig.show()
-    #plt.show()
-
-    # -------------------
-    # 3: MA/ VWMA vs Indexes
-    # -------------------
-    from main_modules.create_databases import create_databases  # or update_databases
-    import indicators.ma_indicators_1 as mai
-    import plotting.plot_ma_indicators_1 as pmai
-
-    df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(index_df, components_df)
     df_idx_with_osc = mai.calculate_ma_vwma_max_min(df_idx_mas, ps)
-    df_idx_agg = mai.calculate_tickers_over_under_mas(df_idx_mas, df_eod_mas, ps)
-    df_idx_compress, df_comp_compress = mai.calculate_compressao_dispersao(df_idx_mas, df_eod_mas)
+    df_idx_agg = mai.calculate_tickers_over_under_mas(
+        df_idx_mas, df_eod_mas, ps
+    )
 
-    # -------------------------
-    # 3: VWMA TRENDS vs Indexes
-    # -------------------------
-    import indicators.ma_indicators_2 as mai2
-    import plotting.plot_ma_indicators_2 as pmai2
+    df_idx_compress, df_comp_compress = mai.calculate_compressao_dispersao(
+        df_idx_mas, df_eod_mas
+    )
 
     df_trends = mai2.build_vwma_trend_counts_and_percents(df_eod_mas)
 
-    #---------------------------------------------
-    # MAKE PDF -----------------------------------
-    #---------------------------------------------
-    # Create the output PDF path
-    pdf_filename = f"{ps.mkt} breadth_{datetime.today().strftime('%Y-%m-%d')}.pdf"
-    pdf_path = os.path.join(fileloc.pdf_folder, pdf_filename)
+    return {
+        "close_vol": out_close_vol,
+        "idx_with_osc": df_idx_with_osc,
+        "idx_agg": df_idx_agg,
+        "idx_compress": df_idx_compress,
+        "comp_compress": df_comp_compress,
+        "trends": df_trends,
+    }
 
-    # Open the PDF file to save plots
-    with PdfPages(pdf_path) as pdf:
 
-        fig1 = plot_close_vol_obv(ps, out_df)
-        pdf.savefig(fig1)
-        plt.close(fig1)
+# ---------------------------------------
+# 4. Build all figures (NO calculations)
+# ---------------------------------------
+def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
+    from plotting.plot_close_vol_obv import plot_close_vol_obv
+    from plotting.plot_bcb_grid import plot_bcb_grid
+    import plotting.plot_bvsp_vs_indexes as ppbi
+    import plotting.plot_ma_indicators_1 as pmai
+    import plotting.plot_ma_indicators_2 as pmai2
 
-        figs_2 = plot_bcb_grid(
-            ps_long_lookback,
+    figs = []
+
+    figs.append(
+        plot_close_vol_obv(ps, indicators["close_vol"])
+    )
+
+    figs.extend(
+        plot_bcb_grid(
+            ps_long,
             df_bcb_daily,
-            usd_series=usd_series_bcb,
+            usd_series=usd_series,
             nrows=3,
             ncols=2,
         )
-        for fig in figs_2:
+    )
+
+    figs.extend(
+        ppbi.plot_bvsp_vs_all_indices(ps_long, fileloc, nrows=3, ncols=2)
+    )
+
+    figs.append(
+        pmai.plot_index_vs_ma_vwma(indicators["idx_with_osc"], ps)
+    )
+
+    figs.append(
+        pmai.plot_tickers_over_under_mas(indicators["idx_agg"], ps)
+    )
+
+    figs.append(
+        pmai.plot_absolute_compression_bands(
+            indicators["idx_compress"],
+            indicators["comp_compress"],
+            ps,
+        )
+    )
+
+    figs.append(
+        pmai2.plot_vwma_percent_trends_3panels(
+            ps, indicators["trends"]
+        )
+    )
+
+    return figs
+
+
+# ---------------------------------------
+# 5. Export PDF + open
+# ---------------------------------------
+def export_pdf_and_open(figs, fileloc, ps):
+    pdf_name = f"{ps.mkt} breadth_{datetime.today().strftime('%Y-%m-%d')}.pdf"
+    pdf_path = os.path.join(fileloc.pdf_folder, pdf_name)
+
+    with PdfPages(pdf_path) as pdf:
+        for fig in figs:
             pdf.savefig(fig)
             plt.close(fig)
 
-        figs_3 = ppbi.plot_bvsp_vs_all_indices(ps_long_lookback, fileloc, nrows=3, ncols=2)
-        for fig in figs_3:
-            pdf.savefig(fig)
-            plt.close(fig)
+    time.sleep(0.5)
 
-        fig4 = pmai.plot_index_vs_ma_vwma(df_idx_with_osc, ps)
-        pdf.savefig(fig4)
-        plt.close(fig4)
-        fig5 = pmai.plot_tickers_over_under_mas(df_idx_agg, ps)
-        pdf.savefig(fig5)
-        plt.close(fig5)
-        fig6 = pmai.plot_absolute_compression_bands(df_idx_compress, df_comp_compress, ps)
-        pdf.savefig(fig6)
-        plt.close(fig6)
-
-        fig7 = pmai2.plot_vwma_percent_trends_3panels(ps, df_trends)
-        pdf.savefig(fig7)
-        plt.close(fig7)
-
-    # *** CRITICAL: The file is closed here ***
-    # Introduce a small delay to ensure the OS releases the file lock
-    time.sleep(0.5)  # Wait for half a second (0.1 to 1.0 second is usually enough)
-
-    # -----------------------------------
-    # Open PDF automatically if possible
-    # -----------------------------------
     if os.path.exists(pdf_path):
         try:
-            os.startfile(pdf_path)  # For Windows
-        except AttributeError:
-            os.system(f'open "{pdf_path}"')  # For macOS/Linux
-        except FileNotFoundError:
-            # This handles cases where the path is valid but the file still isn't fully ready
-            print(f"Error: Could not find or open file {pdf_path}. Try opening manually.")
-    else:
-        print("PDF not generated: ", pdf_path)
+            os.startfile(pdf_path)
+        except Exception:
+            pass
 
-###################################
-# Main
-###################################
+
+###############################################################
+# ------------------------  MAIN  -----------------------------
+###############################################################
+def main():
+    from core.my_data_types import timed_block
+
+    with timed_block("Load file locations"):
+        fileloc = load_file_locations_dict(file_locations)
+
+    with timed_block("Load + align market data"):
+        config, update_bcb, index_df, components_df = load_and_align_data(fileloc)
+
+    with timed_block("Prepare PlotSetup"):
+        from plotting.common_plot_setup import prepare_plot_data
+        ps = prepare_plot_data(index_df, components_df, config)
+        ps_long = prepare_plot_data(
+            index_df,
+            components_df,
+            replace(config, graph_lookback=config.graph_lookback * 5),
+        )
+
+    with timed_block("Load BCB + USD macro data"):
+        df_bcb_daily, usd_series = load_macro_data(
+            fileloc,
+            ps_long.price_data.index,
+            update_bcb,
+        )
+
+    with timed_block("Compute indicators"):
+        indicators = compute_indicators(index_df, components_df, ps)
+
+    with timed_block("Build figures"):
+        figs = build_figures(
+            ps,
+            ps_long,
+            indicators,
+            df_bcb_daily,
+            usd_series,
+            fileloc,
+        )
+
+    with timed_block("Export PDF + open"):
+        export_pdf_and_open(figs, fileloc, ps)
+
 
 if __name__ == "__main__":
     main()

@@ -78,10 +78,10 @@ ma_groups = {
         "short": {"periods": [5, 12, 25],
                   "color": "red",
                   "port": "curtas"},
-        "medium": {"periods": [40, 60, 80],
+        "medium": {"periods": [40, 50, 60],
                 "color": "springgreen",
                 "port": "médias"},
-        "long": {"periods": [50, 100, 200],
+        "long": {"periods": [80, 100, 200],
                  "color": "darkblue",
                  "port": "longas"}
         }
@@ -96,12 +96,12 @@ trend_combinations = {
         "VWMA5&12&25": ["VWMA5", "VWMA12", "VWMA25"],
         # Medium term combinations
         "VWMA40": ["VWMA40"],
-        "VWMA40&60": ["VWMA40", "VWMA60"],
-        "VWMA40&60&80": ["VWMA40", "VWMA60", "VWMA80"],
+        "VWMA40&50": ["VWMA40", "VWMA50"],
+        "VWMA40&50&60": ["VWMA40", "VWMA50", "VWMA60"],
         # Long term combinations
-        "VWMA50": ["VWMA50"],
-        "VWMA50&100": ["VWMA50", "VWMA100"],
-        "VWMA50&100&200": ["VWMA50", "VWMA100", "VWMA200"]
+        "VWMA80": ["VWMA80"],
+        "VWMA80&100": ["VWMA80", "VWMA100"],
+        "VWMA80&100&200": ["VWMA80", "VWMA100", "VWMA200"]
     }
 
 
