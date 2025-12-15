@@ -52,7 +52,6 @@ def update_databases(config, fileloc):
             try:
                 df = pd.read_csv(idx_path, index_col=0, parse_dates=True)
                 df.index = pd.to_datetime(df.index, errors="coerce")
-
                 # Ensure data is sorted
                 df = df.sort_index()
                 df = df[~df.index.duplicated(keep="first")]
