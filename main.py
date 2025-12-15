@@ -173,6 +173,14 @@ def main():
     df_idx_agg = mai.calculate_tickers_over_under_mas(df_idx_mas, df_eod_mas, ps)
     df_idx_compress, df_comp_compress = mai.calculate_compressao_dispersao(df_idx_mas, df_eod_mas)
 
+    # -------------------------
+    # 3: VWMA TRENDS vs Indexes
+    # -------------------------
+    import indicators.ma_indicators_2 as mai2
+    import plotting.plot_ma_indicators_2 as pmai2
+
+    df_trends = mai2.build_vwma_trend_counts_and_percents(df_eod_mas)
+
     #---------------------------------------------
     # MAKE PDF -----------------------------------
     #---------------------------------------------
@@ -209,12 +217,13 @@ def main():
         fig5 = pmai.plot_tickers_over_under_mas(df_idx_agg, ps)
         pdf.savefig(fig5)
         plt.close(fig5)
-        #fig6 = pmai.plot_compression_dispersion(df_idx_compress, df_comp_compress, ps)
-        #pdf.savefig(fig6)
-        #plt.close(fig6)
         fig6 = pmai.plot_absolute_compression_bands(df_idx_compress, df_comp_compress, ps)
         pdf.savefig(fig6)
         plt.close(fig6)
+
+        fig7 = pmai2.plot_vwma_percent_trends_3panels(ps, df_trends)
+        pdf.savefig(fig7)
+        plt.close(fig7)
 
     # *** CRITICAL: The file is closed here ***
     # Introduce a small delay to ensure the OS releases the file lock

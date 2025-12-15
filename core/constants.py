@@ -259,7 +259,7 @@ ma_color_map = {
         '%±VWMA200': 'indigo'
     }
 
-trend_combinations = {
+"""trend_combinations = {
         # --- ABOVE MA ---
         ">MA_5": ["AboveBelowMA5"],
         ">MA_5_12": ["AboveBelowMA5", "AboveBelowMA12"],
@@ -297,3 +297,4 @@ trend_combinations = {
         "<VWMA_50_100": ["AboveBelowVWMA50", "AboveBelowVWMA100"],
         "<VWMA_50_100_200": ["AboveBelowVWMA50", "AboveBelowVWMA100", "AboveBelowVWMA200"]
     }
+"""
