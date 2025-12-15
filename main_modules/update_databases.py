@@ -91,8 +91,19 @@ def _should_skip_update(last_existing_date, requested_last_date, last_yahoo_end_
 def _merge_and_update_data(old_df, new_data, requested_last_date):
     """Merge old and new data efficiently, handling overlaps.
     
+    This function combines existing data with newly downloaded data, ensuring that
+    newer data overwrites older data for overlapping dates. It also filters the
+    result to only include dates up to the requested end date.
+    
+    Args:
+        old_df: Existing DataFrame with historical data
+        new_data: Newly downloaded DataFrame to merge with existing data
+        requested_last_date: Latest date to include in the final dataset (date object)
+    
     Returns:
-        tuple: (updated_df, changed) where changed is True if data was modified
+        tuple: (updated_df, changed) where:
+            - updated_df: Merged and filtered DataFrame
+            - changed: True if data was modified, False otherwise
     """
     # Create a copy to avoid modifying the original new_data
     new_data = new_data.copy()
@@ -211,11 +222,8 @@ def update_databases(config, fileloc):
                     print(f"----------------- ✔ Saved updated index: {idx_path} -------------")
                     df = updated
                 else:
-                    # No changes could be due to empty new_data or no new unique data
-                    if new_data.empty:
-                        print(f"-------------- No new index data for {idx_code} ---------------")
-                    else:
-                        print(f"-------------- No new unique index data for {idx_code} ---------------")
+                    # No changes means either no new data or no unique data after merge
+                    print(f"-------------- No new data to update for {idx_code} ---------------")
 
                 # If this is the market being studied → assign for return
                 if idx_code == idx_code_to_study:
