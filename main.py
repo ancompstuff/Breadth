@@ -165,7 +165,7 @@ def main():
     # 3: MA/ VWMA vs Indexes
     # -------------------
     from main_modules.create_databases import create_databases  # or update_databases
-    import indicators.ma_indicators as mai
+    import indicators.ma_indicators_1 as mai
     import plotting.plot_ma_indicators_1 as pmai
 
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(index_df, components_df)

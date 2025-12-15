@@ -54,7 +54,6 @@ bcb_default_series = {
     4390: "SELIC",
 }
 
-
 #--------------------------
 # DATA FILE LOCATIONS
 #--------------------------
@@ -79,7 +78,7 @@ ma_groups = {
         "short": {"periods": [5, 12, 25],
                   "color": "red",
                   "port": "curtas"},
-        "medium": {"periods": [40, 80],
+        "medium": {"periods": [40, 60, 80],
                 "color": "springgreen",
                 "port": "médias"},
         "long": {"periods": [50, 100, 200],
@@ -88,7 +87,23 @@ ma_groups = {
         }
 
 mas_list = sorted([ma for group_data in ma_groups.values() for ma in group_data["periods"]])
-# # Resulting mas_list: [5, 12, 25, 40, 50, 80, 100, 200]
+# # Resulting mas_list: [5, 12, 25, 40, 50, 60, 80, 100, 200]
+
+trend_combinations = {
+        # Short term combinations
+        "VWMA5": ["VWMA5"],
+        "VWMA5&12": ["VWMA5", "VWMA12"],
+        "VWMA5&12&25": ["VWMA5", "VWMA12", "VWMA25"],
+        # Medium term combinations
+        "VWMA40": ["VWMA40"],
+        "VWMA40&60": ["VWMA40", "VWMA60"],
+        "VWMA40&60&80": ["VWMA40", "VWMA60", "VWMA80"],
+        # Long term combinations
+        "VWMA50": ["VWMA50"],
+        "VWMA50&100": ["VWMA50", "VWMA100"],
+        "VWMA50&100&200": ["VWMA50", "VWMA100", "VWMA200"]
+    }
+
 
 ma_color_map = {
         # MA5 group

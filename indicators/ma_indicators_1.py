@@ -1,4 +1,4 @@
-# ma_indicators.py
+# ma_indicators_1.py
 """
 Modular MA / VWMA calculation and plotting utilities (Approach 1).
 This module expects callers to supply dataframes (loaded elsewhere),
