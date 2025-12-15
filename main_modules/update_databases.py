@@ -21,10 +21,10 @@ def _clean_dataframe(df):
     
     Note: Creates a copy to avoid modifying the original DataFrame.
     """
-    if df.empty:
-        return df
     # Create a copy to avoid side effects
     df = df.copy()
+    if df.empty:
+        return df
     df.index = pd.to_datetime(df.index, errors="coerce")
     df = df.sort_index()
     df = df[~df.index.duplicated(keep="first")]
@@ -94,18 +94,19 @@ def _merge_and_update_data(old_df, new_data, requested_last_date):
     Returns:
         tuple: (updated_df, changed) where changed is True if data was modified
     """
-    if new_data.empty:
-        return old_df, False
-    
     # Create a copy to avoid modifying the original new_data
     new_data = new_data.copy()
     
-    # Clean new data
+    # Clean new data first
     new_data.index = pd.to_datetime(new_data.index, errors="coerce")
     
     # Handle MultiIndex columns for single ticker downloads
     if isinstance(new_data.columns, pd.MultiIndex):
         new_data = new_data.droplevel(1, axis=1)
+    
+    # Check if new data is empty after cleaning
+    if new_data.empty:
+        return old_df, False
     
     # Merge: new data overwrites old on overlap
     updated = pd.concat([old_df, new_data])
@@ -209,10 +210,12 @@ def update_databases(config, fileloc):
                     updated.to_csv(idx_path)
                     print(f"----------------- ✔ Saved updated index: {idx_path} -------------")
                     df = updated
-                elif new_data.empty:
-                    print(f"-------------- No new index data for {idx_code} ---------------")
                 else:
-                    print(f"-------------- No new unique index data for {idx_code} ---------------")
+                    # No changes could be due to empty new_data or no new unique data
+                    if new_data.empty:
+                        print(f"-------------- No new index data for {idx_code} ---------------")
+                    else:
+                        print(f"-------------- No new unique index data for {idx_code} ---------------")
 
                 # If this is the market being studied → assign for return
                 if idx_code == idx_code_to_study:
