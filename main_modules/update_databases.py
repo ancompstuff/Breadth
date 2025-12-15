@@ -17,9 +17,14 @@ def _parse_dates_once(download_end_date, yf_end_date):
 
 
 def _clean_dataframe(df):
-    """Consolidate DataFrame cleaning operations."""
+    """Consolidate DataFrame cleaning operations.
+    
+    Note: Creates a copy to avoid modifying the original DataFrame.
+    """
     if df.empty:
         return df
+    # Create a copy to avoid side effects
+    df = df.copy()
     df.index = pd.to_datetime(df.index, errors="coerce")
     df = df.sort_index()
     df = df[~df.index.duplicated(keep="first")]
@@ -70,9 +75,16 @@ def _should_skip_update(last_existing_date, requested_last_date, last_yahoo_end_
 
 
 def _merge_and_update_data(old_df, new_data, requested_last_date):
-    """Merge old and new data efficiently, handling overlaps."""
+    """Merge old and new data efficiently, handling overlaps.
+    
+    Returns:
+        tuple: (updated_df, changed) where changed is True if data was modified
+    """
     if new_data.empty:
         return old_df, False
+    
+    # Create a copy to avoid modifying the original new_data
+    new_data = new_data.copy()
     
     # Clean new data
     new_data.index = pd.to_datetime(new_data.index, errors="coerce")
@@ -259,6 +271,8 @@ def update_databases(config, fileloc):
                 if comp_new_data.empty:
                     print(f"--------- No missing component data for {market_name} ----------------")
                 else:
+                    # Clean new data (creates a copy internally)
+                    comp_new_data = comp_new_data.copy()
                     comp_new_data.index = pd.to_datetime(comp_new_data.index, errors="coerce")
 
                     # Merge: new data overwrites old data on overlap
