@@ -168,7 +168,6 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
             indicators["mini_ladders"],  # for panels 1-3
         )
     )
-
     return figs
 
 
