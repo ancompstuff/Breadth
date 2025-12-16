@@ -1,19 +1,21 @@
 import pandas as pd
-from core.constants import mas_list, trend_combinations
+from core.constants import mas_list
 
 # =====================================================================
 # 1. VWMA BREADTH (%>VWMA, %<VWMA)
 # =====================================================================
+
 def build_vwma_trend_counts_and_percents(
     df_eod_with_vwmas: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Builds classic VWMA breadth series.
+    """Build classic VWMA breadth series.
 
-    Output columns:
-        Nº>VWMA5, %>VWMA5
-        Nº<VWMA5, %<VWMA5
-        ...
+    For each VWMA period p in mas_list, compute per-date counts and percents of
+    tickers with price above/below VWMAp.
+
+    Output columns (for each p):
+        Nº>V{p}, %>V{p}
+        Nº<V{p}, %<V{p}
     """
 
     assert "Adj Close" in df_eod_with_vwmas.columns.levels[0]
@@ -21,7 +23,7 @@ def build_vwma_trend_counts_and_percents(
     adj = df_eod_with_vwmas.xs("Adj Close", level=0, axis=1)
     n_tickers = adj.shape[1]
 
-    out = {}
+    out: dict[str, pd.Series] = {}
 
     for p in mas_list:
         vwma = df_eod_with_vwmas.xs(f"VWMA{p}", level=0, axis=1)
@@ -41,16 +43,16 @@ def build_vwma_trend_counts_and_percents(
 # =====================================================================
 # 2. TRUE LADDER LOGIC (STRICT STRUCTURE)
 # =====================================================================
+
 def _strict_ladder_condition(
     adj: pd.DataFrame,
     vwmas: list[pd.DataFrame],
 ) -> pd.DataFrame:
-    """
-    Enforces a TRUE ladder:
+    """Enforce a strict ladder:
 
         price > v0 > v1 > v2 > ...
 
-    Nothing else is checked.
+    Returns a boolean DataFrame (date x ticker).
     """
 
     cond = adj > vwmas[0]
@@ -62,27 +64,44 @@ def _strict_ladder_condition(
 
 
 # =====================================================================
-# 3. TRUE VWMA LADDERS (MAIN + MINI)
+# 3. TRUE VWMA LADDERS (MAIN + SELECTED MINI)
 # =====================================================================
+
+def _vwma(df_eod_with_vwmas: pd.DataFrame, p: int) -> pd.DataFrame:
+    return df_eod_with_vwmas.xs(f"VWMA{p}", level=0, axis=1)
+
+
+
 def build_vwma_true_ladders(
     df_eod_with_vwmas: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Builds TRUE VWMA ladders.
+    """Build TRUE VWMA ladders (percent of tickers satisfying strict structure).
 
-    MAIN ladder:
-        VWMA5 → VWMA200 (using mas_list order)
+    Produces:
 
-    MINI ladders:
-        From trend_combinations (e.g. VWMA40→60, VWMA80→200)
-
-    Output columns (examples):
+    1) MAIN ladder prefixes from VWMA5 -> VWMA200 (using mas_list order):
         $>V5
         $>V5>V12
-        $>V5>V12>V25
         ...
-        $>V40>V50 (medium)
-        $>V80>V100>V200 (long)
+        $>V5>...>V200
+
+    2) MINI ladders that DO NOT depend on lower VWMAs:
+
+       - mini$>40 ladder (uses only VWMA40/50/60):
+            mini$>V40
+            mini$>V40>V50
+            mini$>V40>V50>V60
+
+       - mini$>80 ladder (uses only VWMA80/100/200):
+            mini$>V80
+            mini$>V80>V100
+            mini$>V80>V100>V200
+
+    Notes:
+    - All outputs are percentages (0..100), not counts.
+    - The mini ladders are computed from scratch (price > first VWMA, then strict
+      ordering within the mini set). They do not require anything about VWMA < 40
+      or < 80.
     """
 
     assert "Adj Close" in df_eod_with_vwmas.columns.levels[0]
@@ -90,18 +109,15 @@ def build_vwma_true_ladders(
     adj = df_eod_with_vwmas.xs("Adj Close", level=0, axis=1)
     n_tickers = adj.shape[1]
 
-    out = {}
+    out: dict[str, pd.Series] = {}
 
     # ---------------------------------------------------------------
-    # MAIN LADDER (mas_list)
+    # 1) MAIN LADDER (mas_list)
     # ---------------------------------------------------------------
     for i in range(len(mas_list)):
         rung = mas_list[: i + 1]
 
-        vwmas = [
-            df_eod_with_vwmas.xs(f"VWMA{p}", level=0, axis=1)
-            for p in rung
-        ]
+        vwmas = [_vwma(df_eod_with_vwmas, p) for p in rung]
 
         cond = _strict_ladder_condition(adj, vwmas)
         pct = cond.sum(axis=1) / n_tickers * 100.0
@@ -110,23 +126,31 @@ def build_vwma_true_ladders(
         out[label] = pct
 
     # ---------------------------------------------------------------
-    # MINI LADDERS (trend_combinations)
+    # 2) MINI LADDER: 40/50/60 (independent of lower VWMAs)
     # ---------------------------------------------------------------
-    for name, fields in trend_combinations.items():
-        periods = [int(f.replace("VWMA", "")) for f in fields]
+    mini40_periods = [40, 50, 60]
+    for i in range(len(mini40_periods)):
+        rung = mini40_periods[: i + 1]
+        vwmas = [_vwma(df_eod_with_vwmas, p) for p in rung]
 
-        for i in range(len(periods)):
-            rung = periods[: i + 1]
+        cond = _strict_ladder_condition(adj, vwmas)
+        pct = cond.sum(axis=1) / n_tickers * 100.0
 
-            vwmas = [
-                df_eod_with_vwmas.xs(f"VWMA{p}", level=0, axis=1)
-                for p in rung
-            ]
+        label = "mini$>" + ">".join(f"V{p}" for p in rung)
+        out[label] = pct
 
-            cond = _strict_ladder_condition(adj, vwmas)
-            pct = cond.sum(axis=1) / n_tickers * 100.0
+    # ---------------------------------------------------------------
+    # 3) MINI LADDER: 80/100/200 (independent of lower VWMAs)
+    # ---------------------------------------------------------------
+    mini80_periods = [80, 100, 200]
+    for i in range(len(mini80_periods)):
+        rung = mini80_periods[: i + 1]
+        vwmas = [_vwma(df_eod_with_vwmas, p) for p in rung]
 
-            label = "$>" + ">".join(f"V{p}" for p in rung)
-            out[f"{label} ({name})"] = pct
+        cond = _strict_ladder_condition(adj, vwmas)
+        pct = cond.sum(axis=1) / n_tickers * 100.0
+
+        label = "mini$>" + ">".join(f"V{p}" for p in rung)
+        out[label] = pct
 
     return pd.DataFrame(out, index=df_eod_with_vwmas.index)
