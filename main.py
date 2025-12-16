@@ -103,6 +103,7 @@ def compute_indicators(index_df, components_df, ps):
     )
 
     df_trends = mai2.build_vwma_trend_counts_and_percents(df_eod_mas)
+    df_ladder = mai2.build_vwma_true_ladders(df_eod_mas)
 
     return {
         "close_vol": out_close_vol,
@@ -111,7 +112,8 @@ def compute_indicators(index_df, components_df, ps):
         "idx_compress": df_idx_compress,
         "comp_compress": df_comp_compress,
         "trends": df_trends,
-    }
+        "ladder": df_ladder,
+    }  #  this is a dictionary, currently with no name. Named in main.py
 
 
 # ---------------------------------------
@@ -161,8 +163,10 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     )
 
     figs.append(
-        pmai2.plot_vwma_percent_trends_3panels(
-            ps, indicators["trends"]
+        pmai2.plot_vwma_percent_trends_4panels(
+            ps,
+            indicators["trends"],
+            indicators["ladder"]
         )
     )
 
