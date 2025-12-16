@@ -89,21 +89,6 @@ ma_groups = {
 mas_list = sorted([ma for group_data in ma_groups.values() for ma in group_data["periods"]])
 # # Resulting mas_list: [5, 12, 25, 40, 50, 60, 80, 100, 200]
 
-trend_combinations = {
-        # Short term combinations
-        "VWMA5": ["VWMA5"],
-        "VWMA5&12": ["VWMA5", "VWMA12"],
-        "VWMA5&12&25": ["VWMA5", "VWMA12", "VWMA25"],
-        # Medium term combinations
-        "VWMA40": ["VWMA40"],
-        "VWMA40&50": ["VWMA40", "VWMA50"],
-        "VWMA40&50&60": ["VWMA40", "VWMA50", "VWMA60"],
-        # Long term combinations
-        "VWMA80": ["VWMA80"],
-        "VWMA80&100": ["VWMA80", "VWMA100"],
-        "VWMA80&100&200": ["VWMA80", "VWMA100", "VWMA200"]
-    }
-
 
 ma_color_map = {
         # MA5 group

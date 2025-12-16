@@ -4,21 +4,19 @@ import numpy as np
 
 def plot_vwma_percent_trends_4panels(
     ps,
-    df_trends,   # unused, kept for API stability
-    df_ladder,
+    ladder,      # <- main ladder (heatmap uses this)
+    mini_ladders # <- mini ladders (subplots 1–3 use this)
 ):
     """
-    Plot TRUE VWMA ladder participation (%).
-
     Panels:
-        1) Short ladder  (ends at 25)
-        2) Medium ladder (ends at 40–60)
-        3) Long ladder   (ends at 80–200)
-        4) Heatmap: full ladder
+        1) Short mini ladder (s)
+        2) Medium mini ladder (m)
+        3) Long mini ladder (l)
+        4) Heatmap: full main ladder (5 -> 200)
     """
 
-    df_ladder = df_ladder.tail(ps.lookback_period)
-    print(df_ladder.columns)
+    ladder = ladder.tail(ps.lookback_period)
+    mini_ladders = mini_ladders.tail(ps.lookback_period)
 
     fig, axes = plt.subplots(
         nrows=4,
@@ -27,39 +25,25 @@ def plot_vwma_percent_trends_4panels(
         sharex=True
     )
 
-    # ------------------------------------------------------------------
-    # CORRECT ladder columns (EXISTING)
-    # ------------------------------------------------------------------
-    short_cols = [
-        "$>V5",
-        "$>V5>V12",
-        "$>V5>V12>V25",
-    ]
-
-    medium_cols = [
-        "$>V5>V12>V25>V40",
-        "$>V5>V12>V25>V40>V50",
-        "$>V5>V12>V25>V40>V50>V60",
-    ]
-
-    long_cols = [
-        "$>V5>V12>V25>V40>V50>V60>V80",
-        "$>V5>V12>V25>V40>V50>V60>V80>V100",
-        "$>V5>V12>V25>V40>V50>V60>V80>V100>V200",
-    ]
+    # -------------------------
+    # Columns for panels 1–3
+    # -------------------------
+    short_cols = ["s$>V5%", "s$>V5>V12%", "s$>V5>V12>V25%"]
+    medium_cols = ["m$>V40%", "m$>V40>50%", "m$>V40>50>60%"]
+    long_cols = ["l$>V80%", "l$>V80>100%", "l$>V80>100>200%"]
 
     bar_labels = {
         short_cols[0]: "$>VWMA5 (%)",
         short_cols[1]: "$>VWMA5>12 (%)",
         short_cols[2]: "$>VWMA5>12>25 (%)",
 
-        medium_cols[0]: "$>VWMA5–40 (%)",
-        medium_cols[1]: "$>VWMA5–50 (%)",
-        medium_cols[2]: "$>VWMA5–60 (%)",
+        medium_cols[0]: "$>VWMA40 (%)",
+        medium_cols[1]: "$>VWMA40>50 (%)",
+        medium_cols[2]: "$>VWMA40>50>60 (%)",
 
-        long_cols[0]: "$>VWMA5–80 (%)",
-        long_cols[1]: "$>VWMA5–100 (%)",
-        long_cols[2]: "$>VWMA5–200 (%)",
+        long_cols[0]: "$>VWMA80 (%)",
+        long_cols[1]: "$>VWMA80>100 (%)",
+        long_cols[2]: "$>VWMA80>100>200 (%)",
     }
 
     colors = ["#d62728", "#ff7f0e", "#2ca02c"]
@@ -70,20 +54,19 @@ def plot_vwma_percent_trends_4panels(
         ("Long-term ladder", long_cols),
     ]
 
-    # ------------------------------------------------------------------
-    # First 3 panels
-    # ------------------------------------------------------------------
+    # -------------------------
+    # First 3 panels (mini_ladders)
+    # -------------------------
     for ax, (title, cols) in zip(axes[:3], panels):
-
         ps.plot_price_layer(ax)
         ax_r = ax.twinx()
 
         for c, col in zip(colors, cols):
             ax_r.bar(
                 ps.plot_index,
-                df_ladder[col].values,
+                mini_ladders[col].values,
                 color=c,
-                alpha=0.85,
+                alpha=0.6,
                 label=bar_labels[col],
                 zorder=5
             )
@@ -96,12 +79,22 @@ def plot_vwma_percent_trends_4panels(
         ps.fix_xlimits(ax)
         ax_r.legend(loc="upper left", fontsize=8, frameon=True)
 
-    # ------------------------------------------------------------------
-    # Heatmap — FULL ladder (already correct)
-    # ------------------------------------------------------------------
+    # -------------------------
+    # Heatmap (main ladder)
+    # -------------------------
     ax_hm = axes[3]
 
-    heat_cols = list(df_ladder.columns)
+    heat_cols = [
+        "$>V5%",
+        "$>V5>V12%",
+        "$>V5>V12>V25%",
+        "$>V5>V12>V25>V40%",
+        "$>V5>V12>V25>V40>V50%",
+        "$>V5>V12>V25>V40>V50>V60%",
+        "$>V5>V12>V25>V40>V50>V60>V80%",
+        "$>V5>V12>V25>V40>V50>V60>V80>V100%",
+        "$>V5>V12>V25>V40>V50>V60>V80>V100>V200%",
+    ]
 
     heat_labels = [
         "$>VWMA5 ladder",
@@ -115,7 +108,11 @@ def plot_vwma_percent_trends_4panels(
         "$>VWMA5–200 ladder",
     ]
 
-    heat_data = df_ladder[heat_cols].T.values
+    missing = [c for c in heat_cols if c not in ladder.columns]
+    if missing:
+        raise KeyError(f"Missing expected ladder columns for heatmap: {missing}")
+
+    heat_data = ladder[heat_cols].T.values
 
     ax_hm.imshow(
         heat_data,
@@ -134,7 +131,8 @@ def plot_vwma_percent_trends_4panels(
     fig.suptitle(
         f"{ps.idx} – VWMA Structural Participation (%) "
         f"({ps.sample_start} → {ps.sample_end})",
-        fontsize=12
+        fontsize=12,
+        fontweight='bold'
     )
 
     return fig

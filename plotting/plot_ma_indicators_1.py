@@ -299,12 +299,20 @@ def plot_absolute_compression_bands(idx_ma_df: pd.DataFrame,
         labels.append(f"VWMA{ma}")
 
     if rows:
+        # 1. Reverse the order of the rows list
+        rows.reverse()
+
+        # 2. Reverse the order of the labels list
+        labels.reverse()
+
+        # 3. Create the numpy array from the reversed rows
         heat = np.array(rows)
         im = ax_hm.imshow(
             heat,
             cmap="hot",
             aspect="auto",
             interpolation="nearest",
+            origin="lower",
             extent=[0, len(x), 0, len(rows)]
         )
 
