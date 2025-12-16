@@ -87,7 +87,7 @@ def compute_indicators(index_df, components_df, ps):
     import indicators.ma_indicators_1 as mai
     import indicators.ma_indicators_2 as mai2
 
-    out_close_vol = compute_close_vol_obv(index_df)
+    out_close_vol = compute_close_vol_obv(index_df, components_df)
 
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(
         index_df, components_df
