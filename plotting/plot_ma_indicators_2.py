@@ -18,6 +18,7 @@ def plot_vwma_percent_trends_4panels(
     """
 
     df_ladder = df_ladder.tail(ps.lookback_period)
+    print(df_ladder.columns)
 
     fig, axes = plt.subplots(
         nrows=4,
