@@ -84,10 +84,13 @@ def load_macro_data(fileloc, trading_index, update_bcb):
 # ---------------------------------------
 def compute_indicators(index_df, components_df, ps):
     from indicators.close_vol_obv import compute_close_vol_obv
+    import indicators.hi_lo_indicators as ihi
     import indicators.ma_indicators_1 as mai
     import indicators.ma_indicators_2 as mai2
 
     out_close_vol = compute_close_vol_obv(index_df, components_df)
+
+    hi_lo_diff = ihi.calculate_highs_and_lows(components_df)
 
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(
         index_df, components_df
@@ -106,6 +109,7 @@ def compute_indicators(index_df, components_df, ps):
 
     return {
         "close_vol": out_close_vol,
+        "hi_lo_diff": hi_lo_diff,
         "idx_with_osc": df_idx_with_osc,
         "idx_agg": df_idx_agg,
         "idx_compress": df_idx_compress,
@@ -120,6 +124,7 @@ def compute_indicators(index_df, components_df, ps):
 # ---------------------------------------
 def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     from plotting.plot_close_vol_obv import plot_close_vol_obv
+    import plotting.plot_hi_lo as phi
     from plotting.plot_bcb_grid import plot_bcb_grid
     import plotting.plot_bvsp_vs_indexes as ppbi
     import plotting.plot_ma_indicators_1 as pmai
@@ -129,6 +134,10 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
 
     figs.append(
         plot_close_vol_obv(ps, indicators["close_vol"])
+    )
+
+    figs.append(
+        phi.plot_highs_and_lows(ps, indicators["hi_lo_diff"])
     )
 
     figs.extend(
