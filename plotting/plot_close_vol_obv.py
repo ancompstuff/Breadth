@@ -5,15 +5,14 @@ from core.my_data_types import PlotSetup
 
 def plot_close_vol_obv(ps: PlotSetup, df_in: pd.DataFrame):
     """
-    Plot price, volume, OBV and cumulative NMF.
+    Plot price, volume, OBV and cumulative NMF + component aggregates.
     df must already contain:
-        OBV, NMF_cum, Bearish, Bullish
-    ps.df_to_plot is already sliced to the correct lookback.
+        Volume, OBV, NMF_cum, Bearish, Bullish,
+        Comp_OBV_norm_mean, Comp_NMF_norm_mean,
+        Comp_Bearish, Comp_Bullish (optional, if you want component shading)
     """
-    # Align indicators dataframe to the same datetime index as ps
     df_indicators = df_in.loc[ps.price_data.index].copy()
 
-    # ---------------------------------------------
     fig, (axtop, axbot, axheat) = plt.subplots(
         3, 1, figsize=(18, 9),
         sharex=True,
@@ -21,60 +20,84 @@ def plot_close_vol_obv(ps: PlotSetup, df_in: pd.DataFrame):
     )
 
     # =============================================
-    # TOP — PRICE + VOLUME bars
+    # TOP — PRICE + VOLUME bars (unchanged)
     # =============================================
-    axtop.set_title(f"{ps.mkt} — Preço/Volume ({ps.sample_start} - {ps.sample_end})", fontsize=12, fontweight="bold")
-
-    # Use Plot_setup to plot Adj Close between max/min and shaded and grids)
+    axtop.set_title(
+        f"{ps.mkt} — Preço/Volume ({ps.sample_start} - {ps.sample_end})",
+        fontsize=12, fontweight="bold"
+    )
     ps.plot_price_layer(axtop)
 
-    # Volume colored by price direction
     ax2 = axtop.twinx()
     colors = np.where(ps.price_data["Adj Close"].diff().fillna(0) >= 0, "green", "red")
-    ax2.bar(ps.plot_index, df_indicators["Volume"]/1000, color=colors, width=0.8, zorder=3, alpha=0.5, label="Volume")
+    ax2.bar(ps.plot_index, df_indicators["Volume"] / 1000, color=colors, width=0.8,
+            zorder=3, alpha=0.5, label="Volume")
     ax2.grid(True, axis='y', linestyle='-', alpha=0.3, color='gray', linewidth=0.8)
     ax2.set_ylabel('Volume', color='black')
 
     # =============================================
-    # MID — PRICE + OBV + NMF
+    # MID — PRICE + OBV + NMF (INDEX + COMPONENT AGG)
     # =============================================
-    axbot.set_title(f"{ps.mkt} — OBV & Net Money Flow", fontsize=12)
-
-    # Use Plot_setup to plot Adj Close between max/min and shaded and grids)
+    axbot.set_title(f"{ps.mkt} — OBV & Net Money Flow: Index vs Avg Mkt Component", fontsize=12)
     ps.plot_price_layer(axbot)
 
-    # Shading
-    axbot.fill_between(ps.plot_index, df_indicators["Adj Close"], where=df_indicators["Bearish"]==1, color="red", alpha=0.2)
-    axbot.fill_between(ps.plot_index, df_indicators["Adj Close"], where=df_indicators["Bullish"]==1, color="green", alpha=0.2)
+    # Index shading (unchanged)
+    axbot.fill_between(ps.plot_index, df_indicators["Adj Close"],
+                       where=df_indicators["Bearish"] == 1, color="red", alpha=0.2)
+    axbot.fill_between(ps.plot_index, df_indicators["Adj Close"],
+                       where=df_indicators["Bullish"] == 1, color="green", alpha=0.2)
 
-    # OBV/NMF normalized for overlay
-    obv_norm = (df_indicators["OBV"] - df_indicators["OBV"].min()) / (df_indicators["OBV"].max() - df_indicators["OBV"].min())
-    nmf_norm = (df_indicators["NMF_cum"] - df_indicators["NMF_cum"].min()) / (df_indicators["NMF_cum"].max() - df_indicators["NMF_cum"].min())
+    # Use normalized series produced by indicator function if present,
+    # otherwise fall back to local normalization.
+    if "OBV_norm" in df_indicators.columns and "NMF_norm" in df_indicators.columns:
+        obv_norm = df_indicators["OBV_norm"]
+        nmf_norm = df_indicators["NMF_norm"]
+    else:
+        obv_norm = (df_indicators["OBV"] - df_indicators["OBV"].min()) / (df_indicators["OBV"].max() - df_indicators["OBV"].min())
+        nmf_norm = (df_indicators["NMF_cum"] - df_indicators["NMF_cum"].min()) / (df_indicators["NMF_cum"].max() - df_indicators["NMF_cum"].min())
 
     ax3 = axbot.twinx()
-    ax3.plot(ps.plot_index, obv_norm, label="OBV (normalizado)")
-    ax3.plot(ps.plot_index, nmf_norm, label="NMF_cum (normalizado)")
-    ax3.set_ylabel('OBV / NMF cumulativo', color='black')
+
+    # Index lines
+    ax3.plot(ps.plot_index, obv_norm, label="Index OBV (norm)", linewidth=1.5)
+    ax3.plot(ps.plot_index, nmf_norm, label="Index NMF (norm)", linewidth=1.5)
+
+    # Component aggregate lines (NEW)
+    if "Comp_OBV_norm_mean" in df_indicators.columns:
+        ax3.plot(ps.plot_index, df_indicators["Comp_OBV_norm_mean"],
+                 label="Components OBV (mean norm)", linewidth=1.2, linestyle="--")
+    if "Comp_NMF_norm_mean" in df_indicators.columns:
+        ax3.plot(ps.plot_index, df_indicators["Comp_NMF_norm_mean"],
+                 label="Components NMF (mean norm)", linewidth=1.2, linestyle="--")
+
+    ax3.set_ylabel('OBV / NMF (normalizado)', color='black')
     ax3.legend(loc="upper left")
     ax3.grid(True, axis='y', linestyle='-', alpha=0.3, color='gray', linewidth=0.8)
 
-
     # =============================================
-    # HEATMAP — volume / obv / nmf
+    # HEATMAP — volume / obv / nmf (+ components)
     # =============================================
     vol_norm = ((df_indicators["Volume"] - df_indicators["Volume"].min()) /
                 (df_indicators["Volume"].max() - df_indicators["Volume"].min()))
 
+    # these should already be 0..1 (from compute_close_vol_obv)
+    comp_obv = df_indicators["Comp_OBV_norm_mean"]
+    comp_nmf = df_indicators["Comp_NMF_norm_mean"]
+
     heat = np.vstack([
         vol_norm.values,
         obv_norm.values,
-        nmf_norm.values
+        nmf_norm.values,
+        comp_obv.values,
+        comp_nmf.values,
     ])
-    axheat.imshow(heat, aspect="auto", cmap="hot")
-    axheat.set_yticks([0,1,2])
-    axheat.set_yticklabels(["Volume", "OBV", "NMF"], fontsize=8)
 
-    # X-axis formatting via PlotSetup
+    axheat.imshow(heat, aspect="auto", cmap="hot", vmin=0, vmax=1)
+    axheat.set_yticks([0, 1, 2, 3, 4])
+    axheat.set_yticklabels(
+        ["Volume", "Index OBV", "Index NMF", "Comp OBV", "Comp NMF"],
+        fontsize=8
+    )
+
     ps.apply_xaxis(axheat)
-
     return fig

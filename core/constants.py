@@ -10,14 +10,17 @@ yahoo_market_details = {
         4: {'idx_code': '^GSPC', 'market': 'SP500', 'codes_csv': 'SP500.csv'},
         5: {'idx_code': '^DJI', 'market': 'Dow30', 'codes_csv': 'DOW.csv'},
         6: {'idx_code': 'GC=F', 'market': 'Gold', 'codes_csv': 'none'},
-        7: {'idx_code': 'BTC-USD', 'market': 'Bitcoin', 'codes_csv': 'none'},
-        8: {'idx_code': 'BRL=X', 'market': 'USDollar', 'codes_csv': 'none'},
-        9: {'idx_code': 'CL=F', 'market': 'Crude', 'codes_csv': 'none'},
-        10: {'idx_code': 'ZN=F', 'market': '10yrT-note', 'codes_csv': 'none'},
-        11: {'idx_code': 'ZT=F', 'market': '2yrT-note', 'codes_csv': 'none'},
-        12: {'idx_code': '^VIX', 'market': 'VIX', 'codes_csv': 'none'},
-        13: {'idx_code': '^BVSP', 'market': '3 ticker test', 'codes_csv': 'TEST.csv'},
-        #14: {'idx_code': '^IGCX', 'market': 'iGov', 'codes_csv': 'IGCX.csv'}
+        7: {'idx_code': 'DX-Y.NYB', 'market': 'US Dollar Index', 'codes_csv': 'none'},
+        8: {'idx_code': 'BTC-USD', 'market': 'Bitcoin', 'codes_csv': 'none'},
+        9: {'idx_code': 'GBPUSD=X', 'market': 'GBPound', 'codes_csv': 'none'},
+        10: {'idx_code': 'BR'
+                         'L=X', 'market': 'USDollar', 'codes_csv': 'none'},
+        11: {'idx_code': 'CL=F', 'market': 'Crude', 'codes_csv': 'none'},
+        12: {'idx_code': 'ZN=F', 'market': '10yrT-note', 'codes_csv': 'none'},
+        13: {'idx_code': 'ZT=F', 'market': '2yrT-note', 'codes_csv': 'none'},
+        14: {'idx_code': '^VIX', 'market': 'VIX', 'codes_csv': 'none'},
+        15: {'idx_code': '^BVSP', 'market': '3 ticker test', 'codes_csv': 'TEST.csv'},
+        #16: {'idx_code': '^IGCX', 'market': 'iGov', 'codes_csv': 'IGCX.csv'}
 }
 
 # --------------------------

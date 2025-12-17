@@ -1,7 +1,6 @@
 # IMPORT FUNCTIONS
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-import numpy as np
 import pandas as pd
 import os
 import time
@@ -43,7 +42,7 @@ def main():
     config = what_do_you_want_to_do(fileloc)
 
     # Update BCB data or not (monthly and takes a while)
-    from utils.update_bcb_y_or_n import ask_update_bcb
+    from main_modules.update_bcb_y_or_n import ask_update_bcb
     update_bcb = ask_update_bcb()
 
     #-----------------------------------------------------------------------------
@@ -175,7 +174,6 @@ def main():
     # -------------------
     # 3: MA/ VWMA vs Indexes
     # -------------------
-    from main_modules.create_databases import create_databases  # or update_databases
     import indicators.ma_indicators_1 as mai
     import plotting.plot_ma_indicators_1 as pmai
 

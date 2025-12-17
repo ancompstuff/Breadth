@@ -32,7 +32,7 @@ def load_and_align_data(fileloc):
     config = what_do_you_want_to_do(fileloc)
 
     # 2) Ask BCB update IMMEDIATELY after
-    from utils.update_bcb_y_or_n import ask_update_bcb
+    from main_modules.update_bcb_y_or_n import ask_update_bcb
     update_bcb = ask_update_bcb()
 
     # 3) Build / update market databases
@@ -87,7 +87,7 @@ def compute_indicators(index_df, components_df, ps):
     import indicators.ma_indicators_1 as mai
     import indicators.ma_indicators_2 as mai2
 
-    out_close_vol = compute_close_vol_obv(index_df)
+    out_close_vol = compute_close_vol_obv(index_df, components_df)
 
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(
         index_df, components_df
