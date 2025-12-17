@@ -356,8 +356,8 @@ def build_option_5_test(reference_time: int) -> dict:
     }"""
     return {
             "to_do": 5,
-            "market_to_study": {15: yahoo_market_details[15]},
-            "to_update": {15: yahoo_market_details[15]},
+            "market_to_study": {100: yahoo_market_details[100]},
+            "to_update": {100: yahoo_market_details[100]},
             "graph_lookback": 252,
             "yf_start_date": "2020-01-01",
             "download_end_date": _today_or_yesterday_if_before_hour(reference_time),

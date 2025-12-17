@@ -68,10 +68,14 @@ def plot_bvsp_vs_all_indices(ps: PlotSetup, fileloc, nrows: int = 3, ncols: int 
     # Build list of other index codes from yahoo_market_details (exclude the one being studied)
     idx_bvsp = ps.idx
     other_idx_codes = []
+    code_to_market = {}  # <--- Create this helper dictionary
     for _, info in yahoo_market_details.items():
         code = info.get("idx_code")
+        market = info.get("market")
         if code and code != idx_bvsp:
             other_idx_codes.append(code)
+            # Store the market name using the code as the key
+            code_to_market[code] = market
 
     # Align BVSP Adj Close to PlotSetup index
     df_bvsp = _load_index_series(fileloc, idx_bvsp)
@@ -130,6 +134,11 @@ def plot_bvsp_vs_all_indices(ps: PlotSetup, fileloc, nrows: int = 3, ncols: int 
         bottom_row_axes = []
 
         for i, idx_code in enumerate(chunk):
+
+            # Look up the market name for the current idx_code
+            # .get() is safer in case a code is missing
+            current_market = code_to_market.get(idx_code, "Unknown Market")
+
             ax_left = axes[i]
 
             # Left axis: BVSP
@@ -160,7 +169,7 @@ def plot_bvsp_vs_all_indices(ps: PlotSetup, fileloc, nrows: int = 3, ncols: int 
             ax_left.tick_params(axis="x", labelbottom=False)
 
             # Title
-            ax_left.set_title(f"{idx_bvsp} vs " + r"$\mathbf{" + idx_code + "}$", fontsize=10)
+            ax_left.set_title(f"{idx_bvsp} vs {current_market} ({idx_code})", fontsize=10)
 
             # Legend (combine both axes)
             h_left, l_left = ax_left.get_legend_handles_labels()
