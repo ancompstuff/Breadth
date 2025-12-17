@@ -13,8 +13,7 @@ yahoo_market_details = {
         7: {'idx_code': 'DX-Y.NYB', 'market': 'US Dollar Index', 'codes_csv': 'none'},
         8: {'idx_code': 'BTC-USD', 'market': 'Bitcoin', 'codes_csv': 'none'},
         9: {'idx_code': 'GBPUSD=X', 'market': 'GBPound', 'codes_csv': 'none'},
-        10: {'idx_code': 'BR'
-                         'L=X', 'market': 'USDollar', 'codes_csv': 'none'},
+        10: {'idx_code': 'BRL=X', 'market': 'USDollar', 'codes_csv': 'none'},
         11: {'idx_code': 'CL=F', 'market': 'Crude', 'codes_csv': 'none'},
         12: {'idx_code': 'ZN=F', 'market': '10yrT-note', 'codes_csv': 'none'},
         13: {'idx_code': 'ZT=F', 'market': '2yrT-note', 'codes_csv': 'none'},
