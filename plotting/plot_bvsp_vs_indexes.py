@@ -38,7 +38,12 @@ def _align_series_to_ps_index(series: pd.Series, target_index: pd.Index) -> pd.S
 
     Robust against missing/None series.name by building 'right' explicitly.
     """
-    s = series.sort_index().reindex(target_index).ffill()
+    s = series.sort_index().reindex(target_index)
+    s = s.ffill()
+    # Ensure numeric dtype if possible
+    if s.dtype == 'object':
+        s = pd.to_numeric(s, errors='coerce')
+
     if s.isna().any():
         # Build left/right with explicit 't'/'val' columns to avoid KeyError
         left = pd.DataFrame({"t": pd.Index(target_index)})
@@ -49,8 +54,14 @@ def _align_series_to_ps_index(series: pd.Series, target_index: pd.Index) -> pd.S
             on="t",
             direction="backward"
         )
-        # FIX: use keyword argument 'name=' (previously had a function call 'name(...)')
-        s = pd.Series(merged["val"].values, index=target_index, name=(series.name if series.name else "Adj Close")).ffill()
+        # Create series with explicit dtype conversion
+        vals = pd.to_numeric(merged["val"], errors='coerce')
+        s = pd.Series(
+            vals.values,
+            index=target_index,
+            name=(series.name if series.name else "Adj Close")
+        )
+        s = s.ffill()
     return s
 
 

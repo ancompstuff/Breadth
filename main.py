@@ -86,6 +86,7 @@ def compute_indicators(index_df, components_df, ps):
     from indicators.close_vol_obv import compute_close_vol_obv
     import indicators.ma_indicators_1 as mai
     import indicators.ma_indicators_2 as mai2
+    import indicators.adv_dec_indicators as adi
 
     out_close_vol = compute_close_vol_obv(index_df, components_df)
 
@@ -98,6 +99,8 @@ def compute_indicators(index_df, components_df, ps):
         df_idx_mas, df_eod_mas, ps
     )
 
+    adv_dec_indicators = adi.calculate_advance_decline(index_df, components_df)
+
     df_idx_compress, df_comp_compress = mai.calculate_compressao_dispersao(
         df_idx_mas, df_eod_mas
     )
@@ -108,6 +111,7 @@ def compute_indicators(index_df, components_df, ps):
         "close_vol": out_close_vol,
         "idx_with_osc": df_idx_with_osc,
         "idx_agg": df_idx_agg,
+        "adv_dec_indicators": adv_dec_indicators,
         "idx_compress": df_idx_compress,
         "comp_compress": df_comp_compress,
         "ladder": ladder,
@@ -124,6 +128,7 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     import plotting.plot_bvsp_vs_indexes as ppbi
     import plotting.plot_ma_indicators_1 as pmai
     import plotting.plot_ma_indicators_2 as pmai2
+    import plotting.plot_adv_dec as pad
 
     figs = []
 
@@ -152,6 +157,11 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     figs.append(
         pmai.plot_tickers_over_under_mas(indicators["idx_agg"], ps)
     )
+
+    figs.append(
+        pad.plot_advance_decline(ps, indicators["adv_dec_indicators"])
+    )
+
 
     figs.append(
         pmai.plot_absolute_compression_bands(
