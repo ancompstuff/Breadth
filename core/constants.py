@@ -91,6 +91,28 @@ ma_groups = {
 mas_list = sorted([ma for group_data in ma_groups.values() for ma in group_data["periods"]])
 # # Resulting mas_list: [5, 12, 25, 40, 50, 60, 80, 100, 200]
 
+# ============================================================================
+# Constantes para Plotagem do Indicador Highs/Lows
+# ============================================================================
+
+RAW_COUNT_COLS = ['ATH', 'ATL', '12MH', '12ML', '3MH', '3ML', '1MH', '1ML']
+
+DIFF_COUNT_COLS = ['ATH-ATL', '12MH-12ML', '3MH-3ML', '1MH-1ML']
+
+HI_LO_PLOT_CONFIG = {
+        # Highs (Verde - Gradiente de Forte para Fraco)
+        'ATH': {'label': 'Nº no máximo histórico', 'color': 'darkgreen', 'type': 'high'},
+        '12MH': {'label': 'Nº no máx/12 meses', 'color': 'forestgreen', 'type': 'high'},
+        '3MH': {'label': 'Nº no máx/3 meses', 'color': 'mediumseagreen', 'type': 'high'},
+        '1MH': {'label': 'Nº no máx/1 mes', 'color': 'palegreen', 'type': 'high'},
+
+        # Lows (Vermelho/Marrom - Gradiente de Forte para Fraco)
+        'ATL': {'label': 'Nº no mín histórico', 'color': 'darkred', 'type': 'low'},
+        '12ML': {'label': 'Nº no min/12 meses', 'color': 'firebrick', 'type': 'low'},
+        '3ML': {'label': 'Nº no min/3 meses', 'color': 'tomato', 'type': 'low'},
+        '1ML': {'label': 'Nº no mínimo de 1 mes', 'color': 'sandybrown', 'type': 'low'},
+}
+
 
 ma_color_map = {
         # MA5 group

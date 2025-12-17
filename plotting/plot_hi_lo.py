@@ -2,13 +2,15 @@
 Highs and Lows Plotting
 =======================
 Creates dual-panel visualization:
-1. Top panel: Stacked bars of highs/lows counts + index overlay
-2. Bottom panel: Stacked bars of net differences + index overlay
+1. Top panel: Stacked bars of highs/lows counts (normalized to %) + index overlay
+2. Bottom panel: Stacked bars of net differences (normalized to %) + index overlay
 """
 
 import pandas as pd
 import matplotlib.pyplot as plt
+
 from core.my_data_types import PlotSetup
+from core.constants import RAW_COUNT_COLS, DIFF_COUNT_COLS, HI_LO_PLOT_CONFIG
 
 
 def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
@@ -31,6 +33,7 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
     # Extract the data we need
     lookback = ps.lookback_period
     idx = ps.idx
+    num_tickers = ps.num_tickers  # Total number of stocks
 
     # Slice data based on lookback for plotting
     p = hl_df.iloc[-lookback:]
@@ -40,13 +43,15 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
     date_labels = p_indexed['Date'].dt.strftime("%d/%m/%y").tolist()
     p1 = p_indexed.drop(columns=['Date'])
 
-    # Extract only the raw count columns (not differences)
-    raw_cols = ['ATH', 'ATL', '12MH', '12ML', '3MH', '3ML', '1MH', '1ML']
-    p1_raw = p1[raw_cols]
+    # --- 1) NORMALIZAÇÃO PARA PORCENTAGEM (Subplots 1 e 2) ---
 
-    # Extract only the difference columns
-    diff_cols = ['ATH-ATL', '12MH-12ML', '3MH-3ML', '1MH-1ML']
-    p2 = p1[diff_cols]
+    # Extract, filter, and normalize the raw count columns
+    p1_raw = p1[RAW_COUNT_COLS]
+    p1_raw_norm = (p1_raw / num_tickers) * 100
+
+    # Extract, filter, and normalize the difference columns
+    p2_raw = p1[DIFF_COUNT_COLS]
+    p2_norm = (p2_raw / num_tickers) * 100
 
     # Get price data (already sliced in ps)
     p_idx = ps.price_data['Adj Close'].values
@@ -60,7 +65,7 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
     end_date = p.index[-1].strftime('%d/%m/%y')
 
     #########################################################################
-    # SUBPLOT 1: Highs and Lows Counts
+    # SUBPLOT 1: Highs and Lows Counts (Normalized %)
     #########################################################################
 
     # Plot price on left axis
@@ -72,42 +77,36 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
     # Create twin axis for bars
     ax1_twin = ax1.twinx()
 
-    # Define colors for each indicator
-    plot_stuff = {
-        'ATH': ('deepskyblue', 'Nº papeis no máximo histórico'),
-        'ATL': ('saddlebrown', 'Nº no mín histórico'),
-        '12MH': ('forestgreen', 'Nº no máx/12 meses'),
-        '12ML': ('red', 'Nº no min/12 meses'),
-        '3MH': ('mediumseagreen', 'Nº no máx/3 meses'),
-        '3ML': ('tomato', 'Nº no min/3 meses'),
-        '1MH': ('palegreen', 'Nº no máx/1 mes'),
-        '1ML': ('peachpuff', 'Nº papeis no mínimo de 1 mes')
-    }
+    # Define the order of bars for plotting (reversed so ATH/ATL are on top)
+    # We use RAW_COUNT_COLS and HI_LO_PLOT_CONFIG
 
     # Initialize bottom for stacking
-    bottom = pd.Series([0.0] * len(p1_raw), index=p1_raw.index)
+    bottom = pd.Series([0.0] * len(p1_raw_norm), index=p1_raw_norm.index)
     bar_width = 0.8
 
-    # Plot stacked bars (reversed order so ATH is on top visually)
-    for label_key in reversed(raw_cols):
-        if label_key in plot_stuff:
-            color, label = plot_stuff[label_key]
+    # --- 3) IMPLEMENTAÇÃO DO GRADIENTE DE CORES (Subplot 1) ---
+    # Plot stacked bars (reversed order for better visual stacking)
+    for label_key in reversed(RAW_COUNT_COLS):
+        if label_key in HI_LO_PLOT_CONFIG:
+            config = HI_LO_PLOT_CONFIG[label_key]
+            color, label = config['color'], config['label']
             ax1_twin.bar(
-                p1_raw.index,
-                p1_raw[label_key],
+                p1_raw_norm.index,
+                p1_raw_norm[label_key],  # Usando dados normalizados
                 label=label,
                 color=color,
                 alpha=0.7,
                 width=bar_width,
                 bottom=bottom,
             )
-            bottom += p1_raw[label_key]
+            bottom += p1_raw_norm[label_key]
 
     ax1_twin.set_title(
-        f"{idx} - Nº de novos máximos e novos mínimos - {start_date} a {end_date}",
+        f"{idx} - % de novos máximos e novos mínimos - {start_date} a {end_date}",
         fontsize=12
     )
-    ax1_twin.set_ylabel(f'% papéis ({ps.num_tickers} total)')
+    # Rótulo de eixo atualizado
+    ax1_twin.set_ylabel('Porcentagem de papéis (%)')
     ax1_twin.grid(True, linestyle='--', alpha=0.7)
 
     # Combine legends
@@ -118,15 +117,17 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
         lines1 + lines_twin1,
         labels1 + labels_twin1,
         loc='upper left',
-        bbox_to_anchor=(0.01, 0.99)
+        bbox_to_anchor=(0.01, 0.99),
+        framealpha=0.8,
+        facecolor='white'
     )
 
     #########################################################################
-    # SUBPLOT 2: Highs minus Lows (Net Differences)
+    # SUBPLOT 2: Highs minus Lows (Net Differences - Normalized %)
     #########################################################################
 
     ax2.set_title(
-        f"{idx} - Nº novos máximos menos novos mínimos - {start_date} a {end_date}",
+        f"{idx} - % novos máximos menos novos mínimos",
         fontsize=12
     )
     ax2.set_ylabel(f'{idx} preço')
@@ -144,38 +145,58 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
     # Create twin axis for bars
     ax2_twin = ax2.twinx()
 
+    # --- 2) CÁLCULO E MARCAÇÃO DE EXTREMOS (10º e 90º Percentis) ---
+    # O total_diff representa a soma de todas as diferenças normalizadas (eixos da barra)
+    total_diff = p2_norm.sum(axis=1)
+    p90 = total_diff.quantile(0.9)
+    p10 = total_diff.quantile(0.1)
+
+    # Adiciona as linhas de percentil
+    ax2_twin.axhline(p90, color='darkorange', linestyle='--', linewidth=1.5, alpha=0.8,
+                     label=f'90º Percentil ({p90:.2f}%)')
+    ax2_twin.axhline(p10, color='darkblue', linestyle='--', linewidth=1.5, alpha=0.8,
+                     label=f'10º Percentil ({p10:.2f}%)')
+
     # Initialize bottom for stacking
-    bottom = pd.Series([0.0] * len(p2), index=p2.index)
+    bottom = pd.Series([0.0] * len(p2_norm), index=p2_norm.index)
 
     # Plot stacked difference bars
-    for i, column in enumerate(diff_cols):
+    for i, column in enumerate(DIFF_COUNT_COLS):
+        # Cores para as diferenças: Alto-Baixo Histórico/12M/3M/1M
+        color = ['purple', 'darkcyan', 'mediumblue', 'steelblue'][i]
+
         ax2_twin.bar(
-            p2.index,
-            p2[column],
+            p2_norm.index,
+            p2_norm[column],  # Usando dados normalizados
             label=column,
+            color=color,
             alpha=0.7,
             width=bar_width,
             bottom=bottom,
         )
-        bottom += p2[column]
+        bottom += p2_norm[column]
 
-    ax2_twin.set_ylabel('Nº altos menos Nº baixos')
+    # Rótulo de eixo atualizado
+    ax2_twin.set_ylabel('Porcentagem de papéis (Altos - Baixos)')
 
     # Combine legends
     lines2, labels2 = ax2.get_legend_handles_labels()
     lines_twin2, labels_twin2 = ax2_twin.get_legend_handles_labels()
-    ax2.legend(
+    ax2_twin.legend(
         lines2 + lines_twin2,
         labels2 + labels_twin2,
         loc='upper left',
-        bbox_to_anchor=(0.01, 0.99)
+        bbox_to_anchor=(0.01, 0.99),
+        framealpha=0.8,
+        facecolor='white'
     )
+
 
     return fig
 
 
 # ============================================================================
-# Main for testing
+# Main for testing (mantido inalterado)
 # ============================================================================
 if __name__ == "__main__":
     from core.constants import file_locations
@@ -215,4 +236,4 @@ if __name__ == "__main__":
 
     # Create plot
     fig = plot_highs_and_lows(ps, hl_result)
-    plt.show()
+    #plt.show()
