@@ -3,77 +3,117 @@ import numpy as np
 import talib
 
 
-def calculate_advance_decline(df_idx: pd.DataFrame, df_comp: pd.DataFrame) -> pd.DataFrame:
+def compute_zbt_thrust(
+    zbt: pd.Series,
+    lookback: int = 10,
+    lower: float = 0.40,
+    upper: float = 0.615
+) -> pd.Series:
     """
-    Calculate advance/decline indicators including TRIN, cumulative A/D, and McClellan Oscillator.
+    Compute Zweig Breadth Thrust regime.
 
-    Args:
-        df_idx: Index DataFrame with 'Adj Close' column
-        df_comp:  EOD DataFrame with MultiIndex columns containing 'Adj Close' and 'Volume'
+    A thrust occurs when the 10-day EMA of the breadth ratio
+    rises from below `lower` to above `upper` within `lookback` days.
 
     Returns:
-        DataFrame with advance/decline indicators indexed by date
+        Boolean Series: True while thrust regime is active.
     """
+    thrust_trigger = pd.Series(False, index=zbt.index)
+
+    for i in range(len(zbt)):
+        if zbt.iloc[i] >= upper:
+            start = max(0, i - lookback)
+            if (zbt.iloc[start:i] <= lower).any():
+                thrust_trigger.iloc[i] = True
+
+    # Extend thrust while ZBT remains above lower bound
+    thrust_active = thrust_trigger.copy()
+    for i in range(1, len(thrust_active)):
+        if thrust_active.iloc[i - 1] and zbt.iloc[i] >= lower:
+            thrust_active.iloc[i] = True
+
+    return thrust_active
+
+
+def calculate_advance_decline(df_idx: pd.DataFrame, df_comp: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate advance/decline indicators including:
+    TRIN, cumulative A/D, McClellan Oscillator,
+    McClellan Summation Index (MSI),
+    Zweig Breadth Thrust (ZBT) and ZBT thrust regime.
+    """
+
     # Number of tickers
     num_stocks = df_comp.columns.get_level_values(1).nunique()
 
-    # Get daily price changes
+    # Daily price direction
     price_change = df_comp['Adj Close'].diff()
     price_direction = np.sign(price_change)
 
-    # Count advancing / declining issues
+    # Advancing / declining issues
     advancing_stocks = (price_direction == 1).sum(axis=1)
     declining_stocks = (price_direction == -1).sum(axis=1)
 
-    # Get volumes
+    # Volumes
     volume = df_comp['Volume']
-
-    # Mask for advancing and declining volumes
     advancing_volume = volume.where(price_direction == 1).sum(axis=1)
     declining_volume = volume.where(price_direction == -1).sum(axis=1)
 
-    # Avoid division by zero for TRIN calculation
+    # TRIN components
     adv_issues = advancing_stocks.replace(0, np.nan)
     dec_issues = declining_stocks.replace(0, np.nan)
     adv_vol = advancing_volume.replace(0, np.nan)
     dec_vol = declining_volume.replace(0, np.nan)
 
-    # Calculate TRIN
     trin = (adv_issues / dec_issues) / (adv_vol / dec_vol)
-    trin = trin.rename("TRIN")
-    # TRIN becomes NaN on any day where any part of the ratio is undefined. No declining or advancing stock/vol.
+    trin.name = "TRIN"
 
-
-    # Build main indicators dataframe
-    adv_dec_indicators = pd.DataFrame({
-        'Advancing': advancing_stocks,
-        'Declining': declining_stocks,
-        'TRIN': trin,
-        'idx_close': df_idx['Adj Close']
-    })
-
-    # Calculate A/D difference and cumulative
-    adv_dec_diff = (advancing_stocks - declining_stocks).rename("A/D_diff")
-    adv_dec_cum_diff = adv_dec_diff.cumsum().rename("A/D_cum_diff")
-
-    adv_dec_indicators['A/D_diff'] = adv_dec_diff
-    adv_dec_indicators['A/D_cum_diff'] = adv_dec_cum_diff
-
-    # Calculate EMAs for McClellan Oscillator using TA-Lib
-    adv = adv_dec_indicators['Advancing'].fillna(0).astype('float64').values
-    dec = adv_dec_indicators['Declining'].fillna(0).astype('float64').values
-    diff = adv_dec_indicators['A/D_diff'].fillna(0).astype('float64').values
-
-    adv_dec_indicators['Advancing_EMA_19'] = talib.EMA(adv, timeperiod=19)
-    adv_dec_indicators['Advancing_EMA_39'] = talib.EMA(adv, timeperiod=39)
-    adv_dec_indicators['Declining_EMA_19'] = talib.EMA(dec, timeperiod=19)
-    adv_dec_indicators['Declining_EMA_39'] = talib.EMA(dec, timeperiod=39)
-    adv_dec_indicators['A/D_diff_EMA_19'] = talib.EMA(diff, timeperiod=19)
-    adv_dec_indicators['A/D_diff_EMA_39'] = talib.EMA(diff, timeperiod=39)
-
-    # Calculate McClellan Oscillator
-    adv_dec_indicators['McClellan_Oscillator'] = (
-            adv_dec_indicators['A/D_diff_EMA_19'] - adv_dec_indicators['A/D_diff_EMA_39']
+    adv_dec_indicators = pd.DataFrame(
+        {
+            'Advancing': advancing_stocks,
+            'Declining': declining_stocks,
+            'TRIN': trin,
+            'idx_close': df_idx['Adj Close']
+        },
+        index=df_idx.index
     )
+    #adv_dec_indicators.index = df_idx.index
+
+    # ------------------------------------------------------------
+    # Advance / Decline
+    # ------------------------------------------------------------
+    adv_dec_diff = advancing_stocks - declining_stocks
+    adv_dec_indicators['A/D_diff'] = adv_dec_diff
+    adv_dec_indicators['A/D_cum_diff'] = adv_dec_diff.cumsum()
+
+    # ------------------------------------------------------------
+    # McClellan Oscillator
+    # ------------------------------------------------------------
+    diff = adv_dec_diff.fillna(0).astype('float64').values
+
+    ema_19 = talib.EMA(diff, timeperiod=19)
+    ema_39 = talib.EMA(diff, timeperiod=39)
+
+    adv_dec_indicators['McClellan_Oscillator'] = ema_19 - ema_39
+
+    # ------------------------------------------------------------
+    # McClellan Summation Index (MSI)
+    # ------------------------------------------------------------
+    adv_dec_indicators['McClellan_Summation'] = (
+        adv_dec_indicators['McClellan_Oscillator'].cumsum()
+    )
+
+    # ------------------------------------------------------------
+    # Zweig Breadth Thrust (ZBT)
+    # ------------------------------------------------------------
+    total_issues = advancing_stocks + declining_stocks
+    breadth_ratio = advancing_stocks / total_issues.replace(0, np.nan)
+
+    zbt = breadth_ratio.ewm(span=10, adjust=False).mean()
+    adv_dec_indicators['ZBT'] = zbt
+
+    # ZBT thrust regime
+    adv_dec_indicators['ZBT_thrust'] = compute_zbt_thrust(zbt)
+
 
     return adv_dec_indicators

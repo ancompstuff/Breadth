@@ -15,8 +15,10 @@ def plot_vwma_percent_trends_4panels(
         4) Heatmap: full main ladder (5 -> 200)
     """
 
-    ladder = ladder.tail(ps.lookback_period)
-    mini_ladders = mini_ladders.tail(ps.lookback_period)
+    #ladder = ladder.tail(ps.lookback_period)  # does NOT guarantee that the dates match ps.price_data.index
+    ladder = ladder.loc[ps.price_data.index]
+    #mini_ladders = mini_ladders.tail(ps.lookback_period)
+    mini_ladders = mini_ladders.loc[ps.price_data.index]
 
     fig, axes = plt.subplots(
         nrows=4,

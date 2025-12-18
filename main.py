@@ -159,7 +159,7 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     )
 
     figs.append(
-        pad.plot_advance_decline(ps, indicators["adv_dec_indicators"])
+        pad.plot_breadth_breakout(indicators["adv_dec_indicators"], ps)
     )
 
 
