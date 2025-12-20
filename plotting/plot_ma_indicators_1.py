@@ -111,11 +111,13 @@ def plot_index_vs_ma_vwma(df_to_plot: pd.DataFrame, ps: PlotSetup) -> plt.Figure
     return fig
 
 
-def plot_tickers_over_under_mas(df_to_plot: pd.DataFrame, ps: PlotSetup) -> plt.Figure:
+def plot_tickers_over_under_mas(df_in: pd.DataFrame, ps: PlotSetup) -> plt.Figure:
     """
     Plot percent of tickers above/below groupings of MAs/VWMAs.
+    Compatible with neutral-band breadth calculations.
     """
-    df_to_plot = df_to_plot.tail(ps.lookback_period)
+    #df_to_plot = df_to_plot.tail(ps.lookback_period)
+    df_to_plot = df_in.loc[ps.price_data.index].copy()
 
     ma_group_names = list(core.constants.ma_groups.keys())  # short, medium, long
     fig, axs = plt.subplots(3, 1, figsize=(18, 9), sharex=True)
@@ -124,33 +126,69 @@ def plot_tickers_over_under_mas(df_to_plot: pd.DataFrame, ps: PlotSetup) -> plt.
         ma_grouping = ma_group_names[pc]
         ax_twin = ax.twinx()
         title_start = f"{ps.mkt}: {ps.sample_start}-{ps.sample_end}" if pc == 0 else ""
-        ax.set_title(f"{title_start} - Net % (tickers over minus tickers under) {ma_grouping} volume weighted moving avgs", fontsize=12, fontweight="bold")
+        ax.set_title(f"{title_start} - Net % (tickers over minus tickers under)"
+                     f" {ma_grouping} volume weighted moving avgs", fontsize=12, fontweight="bold")
 
         # Use Plot_setup to plot Adj Close between max/min and shaded and grids)
         ps.plot_price_layer(ax)
 
-        for ma in core.constants.ma_groups[ma_grouping]["periods"]:
-            col = f"%±VWMA{ma}"
-            col_label = f"Net over/under {ma}-day VWMA"
-            if col in df_to_plot.columns:
-                ax_twin.plot(ps.plot_index, df_to_plot[col], color=core.constants.ma_color_map.get(col, None), label=col_label)
-                ax_twin.axhline(y=0, color='black', linestyle='--')
-                ax_twin.fill_between(ps.plot_index, df_to_plot[col], 0, where=(df_to_plot[col] >= 0), alpha=0.5, interpolate=True)
-                ax_twin.fill_between(ps.plot_index, df_to_plot[col], 0, where=(df_to_plot[col] <= 0), alpha=0.5, interpolate=True)
+        # Aggregate net % for this MA group (above - below, excluding neutral)
+        group_periods = core.constants.ma_groups[ma_grouping]["periods"]
+        net_vwma_cols = []
+
+        for ma in group_periods:
+            vlabel = f"VWMA{ma}"
+            pct_above_col = f"%>{vlabel}"
+            pct_below_col = f"%<{vlabel}"
+
+            if pct_above_col in df_to_plot.columns and pct_below_col in df_to_plot.columns:
+                # Net % = %above - %below (neutral is implicitly excluded)
+                net_col = f"Net%{vlabel}"
+                df_to_plot[net_col] = df_to_plot[pct_above_col] - df_to_plot[pct_below_col]
+                net_vwma_cols.append(net_col)
+                col_label = f"Net over/under {ma}-day VWMA"
+
+                # Plot individual MA net breadth
+                ax_twin.plot(ps.plot_index, df_to_plot[net_col],
+                             color=core.constants.ma_color_map.get(f"VWMA{ma}", None),
+                             label=col_label, linewidth=2.0)
+
+        # Optional: plot group average net breadth
+        if len(net_vwma_cols) > 1:
+            group_net_col = f"Group avg. net % {ma_grouping}VWMA"
+            df_to_plot[group_net_col] = df_to_plot[net_vwma_cols].mean(axis=1)
+            # Plot the average line
+            ax_twin.plot(ps.plot_index, df_to_plot[group_net_col],
+                         color='black', linewidth=1.5, linestyle=':',
+                         label=f'{ma_grouping.title()} avg net VWMA', alpha=0.8)
+
+        # Formatting
+        ax_twin.axhline(y=0, color='black', linestyle='--', alpha=0.7)
+        # Green fill for positive average breadth
+        ax_twin.fill_between(ps.plot_index, df_to_plot[group_net_col], 0,
+                             where=(df_to_plot[group_net_col] >= 0),
+                             alpha=0.3, color='green', interpolate=True)
+
+        # Red fill for negative average breadth
+        ax_twin.fill_between(ps.plot_index, df_to_plot[group_net_col], 0,
+                             where=(df_to_plot[group_net_col] <= 0),
+                             alpha=0.3, color='red', interpolate=True)
 
         ax_twin.set_ylabel(f'% of {ps.num_tickers} tickers', fontsize=9)
-        ax_twin.legend(loc='upper left')
+        ax_twin.legend(loc='upper left', fontsize=8)
 
-        ax.grid(True, axis='x')
-        ax_twin.grid(True, axis='y')
+        ax.grid(True, axis='x', alpha=0.3)
+        ax_twin.grid(True, axis='y', alpha=0.3)
         ps.fix_xlimits(ax)
         ps.apply_xaxis(ax)
 
+        # Combined legend
         lines, labels = ax.get_legend_handles_labels()
         lines2, labels2 = ax_twin.get_legend_handles_labels()
         ax_twin.legend(lines + lines2, labels + labels2, loc='upper left', fontsize=8, frameon=True)
 
     return fig
+
 
 
 def plot_absolute_compression_bands(idx_ma_df: pd.DataFrame,

@@ -178,7 +178,7 @@ def main():
     import plotting.plot_ma_indicators_1 as pmai
 
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(index_df, components_df)
-    df_idx_with_osc = mai.calculate_ma_vwma_max_min(df_idx_mas, ps)
+    df_idx_with_osc = mai.calc_conver_diver_oscillator(df_idx_mas, ps)
     df_idx_agg = mai.calculate_tickers_over_under_mas(df_idx_mas, df_eod_mas, ps)
     df_idx_compress, df_comp_compress = mai.calculate_compressao_dispersao(df_idx_mas, df_eod_mas)
 

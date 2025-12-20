@@ -4,26 +4,6 @@ import pandas as pd
 from core.my_data_types import PlotSetup
 
 
-#def _shade_thrust_background(ax, thrust_active: pd.Series):
-"""
-    Shade background for contiguous thrust regimes.
-    thrust_active index MUST match the axis x-units.
-    """
-"""in_range = False
-    start = None
-
-    for x, active in thrust_active.items():
-        if active and not in_range:
-            start = x
-            in_range = True
-        elif not active and in_range:
-            ax.axvspan(start, x, color='green', alpha=0.12)
-            in_range = False
-
-    if in_range:
-        ax.axvspan(start, thrust_active.index[-1], color='green', alpha=0.12)"""
-
-
 def plot_breadth_breakout(df_in: pd.DataFrame, ps: PlotSetup) -> plt.Figure:
     """
     Breakout-oriented breadth dashboard.
@@ -54,7 +34,7 @@ def plot_breadth_breakout(df_in: pd.DataFrame, ps: PlotSetup) -> plt.Figure:
     # ------------------------------------------------------------
     # 1. ZBT — Ignition
     # ------------------------------------------------------------
-    axs[0].set_title(f"{ps.mkt} — Zweig Breadth Thrust (Ignition)", fontsize=12, fontweight='bold')
+    axs[0].set_title(f"{ps.mkt} — Zweig Breadth Thrust (Ignition: %age of mkt participating)", fontsize=12, fontweight='bold')
     ps.plot_price_layer(axs[0])
     ax_r0 = axs[0].twinx()
 
@@ -62,63 +42,62 @@ def plot_breadth_breakout(df_in: pd.DataFrame, ps: PlotSetup) -> plt.Figure:
     ax_r0.plot(ps.plot_index, zbt, linewidth=1.6, label='ZBT')
     ax_r0.axhline(0.40, linestyle='--', linewidth=1.2)
     ax_r0.axhline(0.615, linestyle='--', linewidth=1.2)
-    ax_r0.set_ylabel('ZBT')
 
-    """thrust_x = pd.Series(thrust.values, index=ps.plot_index)
-    _shade_thrust_background(axs[0], thrust_x)"""
     axs[0].grid(True, alpha=0.3)
-    ax_r0.legend(loc='upper left')
+    ax_r0.set_ylabel('ZBT')
+    ax_r0.legend(loc="upper left", fontsize=8, frameon=True)
 
     # ------------------------------------------------------------
     # 2. McClellan Oscillator — Acceleration
     # ------------------------------------------------------------
-    axs[1].set_title(f"{ps.mkt} — McClellan Oscillator (Acceleration)", fontsize=12)
+    axs[1].set_title(f"{ps.mkt} — McClellan Oscillator (Acceleration, speed of change)", fontsize=12)
     ps.plot_price_layer(axs[1])
     ax_r1 = axs[1].twinx()
 
     colors = np.where(mcc > 0, 'green', np.where(mcc < 0, 'red', 'gray'))
-    ax_r1.bar(ps.plot_index, mcc, color=colors, alpha=0.7)
+    ax_r1.bar(ps.plot_index, mcc, color=colors, alpha=0.7, label='McClellan Osc')
     ax_r1.axhline(0, linestyle='--', linewidth=1.2)
-    ax_r1.set_ylabel('McClellan')
+    ax_r1.set_ylabel('McClellan Osc.')
 
-    """thrust_x = pd.Series(thrust.values, index=ps.plot_index)
-    _shade_thrust_background(axs[1], thrust_x)"""
 
     axs[1].grid(True, alpha=0.3)
+    ax_r1.legend(loc="upper left", fontsize=8, frameon=True)
 
     # ------------------------------------------------------------
     # 3. McClellan Summation Index — Regime
     # ------------------------------------------------------------
-    axs[2].set_title(f"{ps.mkt} — McClellan Summation Index (Regime)", fontsize=12)
+    axs[2].set_title(f"{ps.mkt} — McClellan Summation Index (Intermediate/Trend Following)", fontsize=12)
     ps.plot_price_layer(axs[2])
     ax_r2 = axs[2].twinx()
 
-    ax_r2.plot(ps.plot_index, msi, linewidth=1.6)
+    ax_r2.plot(ps.plot_index, msi, linewidth=1.6, label='MSI')
     ax_r2.axhline(0, linestyle='--', linewidth=1.2)
     ax_r2.set_ylabel('MSI')
 
-    """thrust_x = pd.Series(thrust.values, index=ps.plot_index)
-    _shade_thrust_background(axs[2], thrust_x)"""
 
     axs[2].grid(True, alpha=0.3)
+    ax_r2.legend(loc="upper left", fontsize=8, frameon=True)
 
     # ------------------------------------------------------------
     # 4. Cumulative A/D — Confirmation
     # ------------------------------------------------------------
-    axs[3].set_title(f"{ps.mkt} — Cumulative Advance / Decline", fontsize=12)
+    axs[3].set_title(f"{ps.mkt} — Cumulative Advance/Decline (Confirmation, measure mkt participation"
+                     f")", fontsize=12)
     ps.plot_price_layer(axs[3])
     ax_r3 = axs[3].twinx()
 
-    ax_r3.plot(ps.plot_index, ad_cum, linewidth=1.6)
+    ax_r3.plot(ps.plot_index, ad_cum, linewidth=1.6, label='Adv − Dec')
     ax_r3.axhline(0, linestyle='--', linewidth=1.2)
-    ax_r3.set_ylabel('Adv − Dec')
-
-    """thrust_x = pd.Series(thrust.values, index=ps.plot_index)
-    _shade_thrust_background(axs[3], thrust_x)"""
+    ax_r3.set_ylabel('Cum. advance/decline')
 
     axs[3].grid(True, alpha=0.3)
+    ax_r3.legend(loc="upper left", fontsize=8, frameon=True)
 
     # X-axis formatting
     ps.apply_xaxis(axs[3])
+
+    # Remove white padding on left and right edges of plots
+    for ax in axs:
+        ax.set_xmargin(0)
 
     return fig

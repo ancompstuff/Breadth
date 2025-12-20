@@ -91,6 +91,20 @@ ma_groups = {
 mas_list = sorted([ma for group_data in ma_groups.values() for ma in group_data["periods"]])
 # # Resulting mas_list: [5, 12, 25, 40, 50, 60, 80, 100, 200]
 
+zscore_params = {
+        "swing" : {"window": 20,
+                   "min_periods": 10,
+                   "clip": 3.5,
+                   "osc_lookback": 63},
+        "longterm": {"window": 50,
+                   "min_periods": 30,
+                   "clip": 4.0,
+                   "osc_lookback": 126},
+        "anomalies": {"window": 30,
+                   "min_periods": 15,
+                   "clip": None,
+                   "osc_lookback": 20}
+}
 
 ma_color_map = {
         # MA5 group

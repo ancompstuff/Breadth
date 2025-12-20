@@ -23,6 +23,52 @@ from main_modules.update_or_create import update_or_create_databases
 from utils.align_dataframes import align_and_prepare_for_plot
 
 
+def debug_ftse_density(idx_ma_df: pd.DataFrame, comp_ma_df: pd.DataFrame):
+    """
+    Prints a diagnostic report on data availability for the FTSE350.
+    """
+    print("=== FTSE350 DATA DENSITY DEBUG ===")
+
+    # 1. Check Index Coverage
+    total_dates = len(idx_ma_df.index)
+    print(f"Total dates in index: {total_dates}")
+
+    # 2. Check VWMA Column Presence
+    vwma_cols = comp_ma_df.columns.get_level_values(0).unique()
+    print(f"VWMA Columns found: {list(vwma_cols)}")
+
+    # 3. Analyze Density per VWMA Period
+    for col_prefix in vwma_cols:
+        if col_prefix.startswith("C-VWMA"):
+            sub_df = comp_ma_df[col_prefix]
+            # Calculate what % of the dataframe is actually populated (not NaN)
+            density = sub_df.notna().sum().sum() / sub_df.size
+
+            # Check for the "Spike" at the end (Last 5 days vs First 5 days)
+            recent_density = sub_df.tail(5).notna().mean().mean()
+            early_density = sub_df.head(5).notna().mean().mean()
+
+            print(f"\nIndicator: {col_prefix}")
+            print(f" -> Overall Fill Rate: {density:.2%}")
+            print(f" -> Start of sample Fill Rate: {early_density:.2%}")
+            print(f" -> End of sample Fill Rate: {recent_density:.2%}")
+            print(f" -> Active tickers at end: {sub_df.iloc[-1].notna().sum()} / {len(sub_df.columns)}")
+
+    # 4. Check for Zero-Width ranges (The 'Black' Heatmap Cause)
+    # The heatmap uses (max - min). If all tickers have the SAME value (e.g., 0 or NaN),
+    # the width is 0, resulting in a black plot.
+    for col_prefix in vwma_cols:
+        if col_prefix.startswith("C-VWMA"):
+            width = comp_ma_df[col_prefix].max(axis=1) - comp_ma_df[col_prefix].min(axis=1)
+            zeros = (width == 0).sum()
+            print(f" -> Dates with Zero Dispersion (Width=0): {zeros} days")
+
+
+# Usage:
+# debug_ftse_density(idx_ma_df, comp_ma_df)
+
+
+
 # ---------------------------
 # 1. Load + align market data
 # ---------------------------
@@ -94,7 +140,7 @@ def compute_indicators(index_df, components_df, ps):
         index_df, components_df
     )
 
-    df_idx_with_osc = mai.calculate_ma_vwma_max_min(df_idx_mas, ps)
+    df_idx_with_osc = mai.calc_conver_diver_oscillator(df_idx_mas, ps)
     df_idx_agg = mai.calculate_tickers_over_under_mas(
         df_idx_mas, df_eod_mas, ps
     )
@@ -109,9 +155,9 @@ def compute_indicators(index_df, components_df, ps):
 
     return {
         "close_vol": out_close_vol,
+        "adv_dec_indicators": adv_dec_indicators,
         "idx_with_osc": df_idx_with_osc,
         "idx_agg": df_idx_agg,
-        "adv_dec_indicators": adv_dec_indicators,
         "idx_compress": df_idx_compress,
         "comp_compress": df_comp_compress,
         "ladder": ladder,
@@ -135,19 +181,8 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     figs.append(
         plot_close_vol_obv(ps, indicators["close_vol"])
     )
-
-    figs.extend(
-        plot_bcb_grid(
-            ps_long,
-            df_bcb_daily,
-            usd_series=usd_series,
-            nrows=3,
-            ncols=2,
-        )
-    )
-
-    figs.extend(
-        ppbi.plot_bvsp_vs_all_indices(ps_long, fileloc, nrows=3, ncols=2)
+    figs.append(
+        pad.plot_breadth_breakout(indicators["adv_dec_indicators"], ps)
     )
 
     figs.append(
@@ -157,11 +192,6 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     figs.append(
         pmai.plot_tickers_over_under_mas(indicators["idx_agg"], ps)
     )
-
-    figs.append(
-        pad.plot_breadth_breakout(indicators["adv_dec_indicators"], ps)
-    )
-
 
     figs.append(
         pmai.plot_absolute_compression_bands(
@@ -178,6 +208,22 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
             indicators["mini_ladders"],  # for panels 1-3
         )
     )
+
+    figs.extend(
+        plot_bcb_grid(
+            ps_long,
+            df_bcb_daily,
+            usd_series=usd_series,
+            nrows=3,
+            ncols=2,
+        )
+    )
+
+    figs.extend(
+        ppbi.plot_bvsp_vs_all_indices(ps_long, fileloc, nrows=3, ncols=2)
+    )
+
+
     return figs
 
 
