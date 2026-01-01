@@ -125,12 +125,15 @@ def load_macro_data(fileloc, trading_index, update_bcb):
 # ---------------------------------------
 def compute_indicators(index_df, components_df, ps):
     from indicators.close_vol_obv import compute_close_vol_obv
+    import indicators.hi_lo_indicators as ihi
     from core.constants import ma_groups
     import indicators.ma_indicators_1 as mai
     import indicators.ma_indicators_2 as mai2
     import indicators.adv_dec_indicators as adi
 
     out_close_vol = compute_close_vol_obv(index_df, components_df)
+
+    hi_lo_diff = ihi.calculate_highs_and_lows(components_df)
 
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(
         index_df, components_df
@@ -151,6 +154,7 @@ def compute_indicators(index_df, components_df, ps):
 
     return {
         "close_vol": out_close_vol,
+        "hi_lo_diff": hi_lo_diff,
         "adv_dec_indicators": adv_dec_indicators,
         "idx_with_osc": df_idx_with_osc,
         "idx_agg": df_idx_agg,
@@ -166,17 +170,23 @@ def compute_indicators(index_df, components_df, ps):
 # ---------------------------------------
 def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     from plotting.plot_close_vol_obv import plot_close_vol_obv
-    from plotting.plot_bcb_grid import plot_bcb_grid
-    import plotting.plot_bvsp_vs_indexes as ppbi
+    import plotting.plot_hi_lo as phi
     import plotting.plot_ma_indicators_1 as pmai
     import plotting.plot_ma_indicators_2 as pmai2
     import plotting.plot_adv_dec as pad
+    from plotting.plot_bcb_grid import plot_bcb_grid
+    import plotting.plot_bvsp_vs_indexes as ppbi
 
     figs = []
 
     figs.append(
         plot_close_vol_obv(ps, indicators["close_vol"])
     )
+
+    figs.append(
+        phi.plot_highs_and_lows(ps, indicators["hi_lo_diff"])
+    )
+
     figs.append(
         pad.plot_breadth_breakout(indicators["adv_dec_indicators"], ps)
     )
