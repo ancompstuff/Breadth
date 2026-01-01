@@ -64,11 +64,6 @@ def debug_ftse_density(idx_ma_df: pd.DataFrame, comp_ma_df: pd.DataFrame):
             print(f" -> Dates with Zero Dispersion (Width=0): {zeros} days")
 
 
-# Usage:
-# debug_ftse_density(idx_ma_df, comp_ma_df)
-
-
-
 # ---------------------------
 # 1. Load + align market data
 # ---------------------------
@@ -130,6 +125,7 @@ def load_macro_data(fileloc, trading_index, update_bcb):
 # ---------------------------------------
 def compute_indicators(index_df, components_df, ps):
     from indicators.close_vol_obv import compute_close_vol_obv
+    from core.constants import ma_groups
     import indicators.ma_indicators_1 as mai
     import indicators.ma_indicators_2 as mai2
     import indicators.adv_dec_indicators as adi
@@ -139,8 +135,8 @@ def compute_indicators(index_df, components_df, ps):
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(
         index_df, components_df
     )
-
     df_idx_with_osc = mai.calc_conver_diver_oscillator(df_idx_mas, ps)
+
     df_idx_agg = mai.calculate_tickers_over_under_mas(
         df_idx_mas, df_eod_mas, ps
     )
@@ -259,6 +255,18 @@ def main():
 
     with timed_block("Load + align market data"):
         config, update_bcb, index_df, components_df = load_and_align_data(fileloc)
+
+        # --- CODE TO SAVE DATAFRAMES ---
+        # Ensure the data directory exists in your repo
+        data_dir = "data_cache"
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+
+        # Save to parquet for high-speed testing
+        index_df.to_parquet(os.path.join(data_dir, "index_df.parquet"))
+        components_df.to_parquet(os.path.join(data_dir, "components_df.parquet"))
+        print(f"DataFrames cached successfully in {data_dir}/")
+        # -----------------------------------
 
     with timed_block("Prepare PlotSetup"):
         from plotting.common_plot_setup import prepare_plot_data

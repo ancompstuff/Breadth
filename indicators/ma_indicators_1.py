@@ -1,9 +1,10 @@
 
-from dataclasses import dataclass
 from typing import List, Tuple, Optional, Any
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from pathlib import Path
+from tabulate import tabulate
+import itertools
 
 # Project constants (assumed present in your project)
 import core.constants
@@ -77,7 +78,10 @@ def calc_conver_diver_oscillator(
     """
     df_result = df_idx_with_mas_vwmas.copy()
 
-    # Column selection (unchanged)
+    # Get short-term periods
+    short_periods = core.constants.ma_groups['short']['periods']
+
+    # Column selection (unchanged for full and no200)
     ma_cols = [c for c in df_result.columns if
                isinstance(c, str) and c.startswith('MA') and not c.startswith(('MA_', 'VWMA_'))]
     vwma_cols = [c for c in df_result.columns if
@@ -85,11 +89,18 @@ def calc_conver_diver_oscillator(
     ma_cols_no200 = [c for c in ma_cols if not c.endswith('200')]
     vwma_cols_no200 = [c for c in vwma_cols if not c.endswith('200')]
 
+    # New: Short-term columns (only for periods in short_periods)
+    short_ma_cols = [c for c in ma_cols if any(c.endswith(str(ma)) for ma in short_periods)]
+    short_vwma_cols = [c for c in vwma_cols if any(c.endswith(str(ma)) for ma in short_periods)]
+
     range_configs = [
         {'cols': ma_cols, 'prefix': 'MA'},
         {'cols': ma_cols_no200, 'prefix': 'MA_no200'},
         {'cols': vwma_cols, 'prefix': 'VWMA'},
-        {'cols': vwma_cols_no200, 'prefix': 'VWMA_no200'}
+        {'cols': vwma_cols_no200, 'prefix': 'VWMA_no200'},
+        # New: Short-term configs
+        {'cols': short_ma_cols, 'prefix': 'short_MA'},
+        {'cols': short_vwma_cols, 'prefix': 'short_VWMA'}
     ]
     for cfg in range_configs:
         if cfg['cols']:
@@ -104,6 +115,9 @@ def calc_conver_diver_oscillator(
     price = df_result['Adj Close']
     df_result['MA_no200_range_pct'] = df_result['MA_no200_range'] / (price + eps)
     df_result['VWMA_no200_range_pct'] = df_result['VWMA_no200_range'] / (price + eps)
+    # New: Short-term normalizations
+    df_result['short_MA_range_pct'] = df_result['short_MA_range'] / (price + eps)
+    df_result['short_VWMA_range_pct'] = df_result['short_VWMA_range'] / (price + eps)
 
     # ---------------------------------------------------------------------------------------------
     # Create oscillator
@@ -114,15 +128,27 @@ def calc_conver_diver_oscillator(
         roll_min_ma = df_result['MA_no200_range_pct'].rolling(window=lookback, min_periods=1).min()
         roll_max_ma = df_result['MA_no200_range_pct'].rolling(window=lookback, min_periods=1).max()
         denom_ma = (roll_max_ma - roll_min_ma).replace(0, np.nan)
-        df_result['MA_no200_osc'] = ((df_result['MA_no200_range_pct'] - roll_min_ma) / denom_ma).clip(0.0,
-                                                                                                      1.0).fillna(
-            0.0)
+        df_result['MA_no200_osc'] = (
+            ((df_result['MA_no200_range_pct'] - roll_min_ma) / denom_ma).clip(0.0,1.0).fillna(0.0))
 
         roll_min_v = df_result['VWMA_no200_range_pct'].rolling(window=lookback, min_periods=1).min()
         roll_max_v = df_result['VWMA_no200_range_pct'].rolling(window=lookback, min_periods=1).max()
         denom_v = (roll_max_v - roll_min_v).replace(0, np.nan)
         df_result['VWMA_no200_osc'] = (
             ((df_result['VWMA_no200_range_pct'] - roll_min_v) / denom_v).clip(0.0, 1.0).fillna(0.0))
+
+        # New: Short-term oscillators for minmax
+        roll_min_short_ma = df_result['short_MA_range_pct'].rolling(window=lookback, min_periods=1).min()
+        roll_max_short_ma = df_result['short_MA_range_pct'].rolling(window=lookback, min_periods=1).max()
+        denom_short_ma = (roll_max_short_ma - roll_min_short_ma).replace(0, np.nan)
+        df_result['short_MA_osc'] = (
+            ((df_result['short_MA_range_pct'] - roll_min_short_ma) / denom_short_ma).clip(0.0, 1.0).fillna(0.0))
+
+        roll_min_short_v = df_result['short_VWMA_range_pct'].rolling(window=lookback, min_periods=1).min()
+        roll_max_short_v = df_result['short_VWMA_range_pct'].rolling(window=lookback, min_periods=1).max()
+        denom_short_v = (roll_max_short_v - roll_min_short_v).replace(0, np.nan)
+        df_result['short_VWMA_osc'] = (
+            ((df_result['short_VWMA_range_pct'] - roll_min_short_v) / denom_short_v).clip(0.0, 1.0).fillna(0.0))
 
     # ---------------------------------------------------------------------------------------------
     elif oscillator_type == 'zscore':
@@ -137,14 +163,26 @@ def calc_conver_diver_oscillator(
             mode=zscore_mode,
             score_params=core.constants.zscore_params  # pass explicitly if needed
         )
+        # New: Short-term oscillators for zscore
+        df_result['short_MA_osc'] = zsc.rolling_robust_zscore(
+            df_result['short_MA_range_pct'],
+            mode=zscore_mode
+        )
+        df_result['short_VWMA_osc'] = zsc.rolling_robust_zscore(
+            df_result['short_VWMA_range_pct'],
+            mode=zscore_mode,
+            score_params=core.constants.zscore_params
+        )
     else:
         raise ValueError("oscillator_type must be 'minmax' or 'zscore'")
     # ---------------------------------------------------------------------------------------------
 
-    # Scale oscillator for plotting (20% of plot height)
+    """ # Scale oscillator for plotting (20% of plot height)
     scale = 0.2 * (plot_setup.ymax - plot_setup.ymin) if (plot_setup.ymax - plot_setup.ymin) != 0 else 1.0
     offset = plot_setup.ymin
     df_result['VWMA_no200_osc_scaled'] = df_result['VWMA_no200_osc'] * scale + offset
+    # New: Short-term scaled oscillator
+    df_result['short_VWMA_osc_scaled'] = df_result['short_VWMA_osc'] * scale + offset"""
 
     return df_result
 
@@ -297,3 +335,61 @@ def calculate_compressao_dispersao(df_idx_with_mas_vwmas: pd.DataFrame,
     return df_idx_compression, df_eod_compression
 
 
+#################################################################################################################
+# ----------------------------------------------- TEST ----------------------------------------------------------
+#################################################################################################################
+if __name__ == "__main__":
+    print(f"{'=' * 30}\nTESTING MODULE: ma_indicators_1\n{'=' * 30}")
+
+    def print_df_summary(name: str, df: pd.DataFrame):
+        print(f"\n>>> DATAFRAME: {name}")
+        print(f"    Shape: {df.shape}")
+        print(f"    Columns ({len(df.columns)}):")
+        # Handle MultiIndex and standard columns for readability
+        cols = [str(c) for c in df.columns.tolist()]
+        if len(cols) > 10:
+            print(f"      {cols[:5]} ... {cols[-5:]}")
+        else:
+            print(f"      {cols}")
+
+
+    # Get the path to the current script, go to its parent, then up again to the root
+    # then look for the data_cache folder
+    data_dir = Path(__file__).resolve().parent.parent / "data_cache"
+
+    index_path = data_dir / "index_df.parquet"
+    comp_path = data_dir / "components_df.parquet"
+
+    # Load the data
+    df_idx = pd.read_parquet(index_path)
+    df_comp = pd.read_parquet(comp_path)
+
+    print(f"Successfully loaded Index data with {len(df_idx)} rows.")
+
+    # FUNCTION TO TEST
+    df_idx_mas, df_comp_mas = calculate_idx_and_comp_ma_vwma(df_idx, df_comp)
+
+    print_df_summary("Index (with MAs/VWMAs)", df_idx_mas)
+    print_df_summary("EOD (with MAs/VWMAs)", df_comp_mas)
+
+    # 1. Extract the unique Level 0 labels
+    # df_idx_mas is single level, so unique() is straightforward
+    idx_labels = df_idx_mas.columns.unique().tolist()
+
+    # df_comp_mas is MultiIndex; we only want the top categories (indicators)
+    comp_labels = df_comp_mas.columns.get_level_values(0).unique().tolist()
+
+    # 2. Align the lists for a side-by-side table
+    # We use zip_longest to handle lists of different lengths
+
+    table_data = list(itertools.zip_longest(idx_labels, comp_labels, fillvalue=""))
+
+    # 3. Print the formatted table
+    print("\n>>> Comparison of Level 0 Column Labels")
+    print(tabulate(
+        table_data,
+        headers=["df_idx_mas (Index Level)", "df_comp_mas (Component Level 0)"],
+        tablefmt="grid"
+    ))
+
+    print(f"\n{'=' * 30}\nTEST COMPLETED\n{'=' * 30}")

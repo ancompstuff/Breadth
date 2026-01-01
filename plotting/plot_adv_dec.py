@@ -40,8 +40,8 @@ def plot_breadth_breakout(df_in: pd.DataFrame, ps: PlotSetup) -> plt.Figure:
 
     #ax_r0.plot(ps.plot_index, zbt, linewidth=1.6, label='ZBT')
     ax_r0.plot(ps.plot_index, zbt, linewidth=1.6, label='ZBT')
-    ax_r0.axhline(0.40, linestyle='--', linewidth=1.2)
-    ax_r0.axhline(0.615, linestyle='--', linewidth=1.2)
+    ax_r0.axhline(0.40, linestyle='--', linewidth=1.2, label= "<0.4= bear mkt, 0-4-0.6 10days=SIGNAL" )
+    ax_r0.axhline(0.615, linestyle='--', linewidth=1.2, label="<0.6=weak, 0.6-1 positive breadth, >1 strong bull mkt")
 
     axs[0].grid(True, alpha=0.3)
     ax_r0.set_ylabel('ZBT')
