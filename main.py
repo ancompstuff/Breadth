@@ -252,7 +252,6 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
         ppbi.plot_bvsp_vs_all_indices(ps_long, fileloc, nrows=3, ncols=2)
     )
 
-
     return figs
 
 
