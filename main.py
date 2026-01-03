@@ -130,10 +130,16 @@ def compute_indicators(index_df, components_df, ps):
     import indicators.ma_indicators_1 as mai
     import indicators.ma_indicators_2 as mai2
     import indicators.adv_dec_indicators as adi
+    from indicators.breakout_indicators import add_breakout_columns
 
     out_close_vol = compute_close_vol_obv(index_df, components_df)
 
     hi_lo_diff = ihi.calculate_highs_and_lows(components_df)
+
+    df_idx_breakouts, df_eod_breakouts = add_breakout_columns(
+        index_df,
+        components_df
+    )
 
     df_idx_mas, df_eod_mas = mai.calculate_idx_and_comp_ma_vwma(
         index_df, components_df
@@ -156,6 +162,8 @@ def compute_indicators(index_df, components_df, ps):
         "close_vol": out_close_vol,
         "hi_lo_diff": hi_lo_diff,
         "adv_dec_indicators": adv_dec_indicators,
+        "idx_breakouts": df_idx_breakouts,
+        #"eod_breakouts": df_eod_breakouts,  #not plotted
         "idx_with_osc": df_idx_with_osc,
         "idx_agg": df_idx_agg,
         "idx_compress": df_idx_compress,
@@ -171,6 +179,11 @@ def compute_indicators(index_df, components_df, ps):
 def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     from plotting.plot_close_vol_obv import plot_close_vol_obv
     import plotting.plot_hi_lo as phi
+    from plotting.plot_breakout_indicators import (
+        plot_breakouts,
+        plot_stockbee_1,
+        plot_stockbee_2,
+    )
     import plotting.plot_ma_indicators_1 as pmai
     import plotting.plot_ma_indicators_2 as pmai2
     import plotting.plot_adv_dec as pad
@@ -185,6 +198,16 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
 
     figs.append(
         phi.plot_highs_and_lows(ps, indicators["hi_lo_diff"])
+    )
+
+    figs.append(
+        plot_breakouts(ps, indicators["idx_breakouts"])
+    )
+    figs.append(
+        plot_stockbee_1(ps, indicators["idx_breakouts"])
+    )
+    figs.append(
+        plot_stockbee_2(ps, indicators["idx_breakouts"])
     )
 
     figs.append(

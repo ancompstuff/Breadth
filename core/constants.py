@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from core.my_data_types import BreakoutCondition
+
 #--------------------------
 # YAHOO MARKET DETAILS
 # #--------------------------
@@ -92,7 +94,6 @@ HI_LO_PLOT_CONFIG = {
         '3ML': {'label': 'Nº no min/3 meses', 'color': 'tomato', 'type': 'low'},
         '1ML': {'label': 'Nº no mínimo de 1 mes', 'color': 'sandybrown', 'type': 'low'},
 }
-
 
 #--------------------------
 # Dictionaries
@@ -281,6 +282,46 @@ ma_color_map = {
         '%<VWMA_50_100_200': 'rebeccapurple',
         '%±VWMA200': 'indigo'
     }
+
+
+
+# --------------------------
+# BREAKOUT / BREAKDOWN EVENTS
+# --------------------------
+breakout_conditions: list[BreakoutCondition] = [
+    BreakoutCondition(1, 1, 0.04, "UP_1d_4%",   "DOWN_1d_4%",   "#1f77b4"),
+    BreakoutCondition(1, 2, 0.06, "UP_2d_6%",   "DOWN_2d_6%",   "#aec7e8"),
+    BreakoutCondition(1, 3, 0.07, "UP_3d_7%",   "DOWN_3d_7%",   "#ff7f0e"),
+    BreakoutCondition(1, 4, 0.08, "UP_4d_8%",   "DOWN_4d_8%",   "#ffbb78"),
+    BreakoutCondition(1, 5, 0.10, "UP_5d_10%",   "DOWN_5d_10%",   "#2ca02c"),
+    BreakoutCondition(1, 6, 0.12, "UP_6d_12%",  "DOWN_6d_12%",  "#98df8a"),
+    BreakoutCondition(1, 7, 0.14, "UP_7d_14%",  "DOWN_7d_14%",  "#d62728"),
+    BreakoutCondition(1, 8, 0.16, "UP_8d_16%",  "DOWN_8d_16%",  "#ff9896"),
+    BreakoutCondition(2, 21, 0.25, "UP_21d_25%","DOWN_21d_25%","#9467bd"),
+    BreakoutCondition(2, 21, 0.50, "UP_21d_50%","DOWN_21d_50%","#c5b0d5"),
+    BreakoutCondition(2, 63, 0.25, "UP_63d_25%","DOWN_63d_25%","#8c564b"),
+    BreakoutCondition(3, 34, 0.13, "UP_34d_13%","DOWN_34d_13%","#e377c2"),
+]
+
+breakout_ma_window: int = 10
+breakout_ratio_windows: tuple[int, int] = (5, 10)
+breakout_primary_group: int = 1
+
+# --------------------------
+# BREAKOUT REGIME / TIMING (derived series)
+# --------------------------
+# Use group 1 (short-horizon breakout cluster) as the "tape" regime proxy
+BREAKOUT_PRIMARY_GROUP: int = 1
+
+# Regime smoothing
+BREAKOUT_IMPULSE_MA_WINDOW: int = 10      # smooth impulse to avoid whipsaw
+BREAKOUT_THRUST_Z_WINDOW: int = 252       # 1y trading days baseline for z-score
+BREAKOUT_THRUST_Z_THRESHOLD: float = 2.0  # "unusually broad" breakout participation
+
+# Background shading alpha in plots
+BREAKOUT_REGIME_SHADE_ALPHA: float = 0.12
+
+
 
 """trend_combinations = {
         # --- ABOVE MA ---

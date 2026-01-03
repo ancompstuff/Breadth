@@ -147,6 +147,49 @@ def timed_block(name: str):
         print(f"[END]   {name} — {elapsed:.3f}s")
 
 
+from dataclasses import dataclass, asdict, field
+import matplotlib.pyplot as plt
+import pandas as pd
+from contextlib import contextmanager
+import time
+
+# ... existing code ...
+
+
+# =============================================================================
+# Breakout indicator condition schema
+# =============================================================================
+@dataclass(frozen=True, slots=True)
+class BreakoutCondition:
+    """
+    One breakout/breakdown rule definition.
+
+    Attributes
+    ----------
+    plot_group:
+        Used to group conditions for different plots / totals.
+        Example: 1 = short-term cluster (1–8 days)
+    period_days:
+        pct_change lookback in trading days.
+    pct:
+        Threshold as a decimal (0.04 = 4%).
+    up_col / down_col:
+        Output column names that will be created in df_idx (aggregates)
+        and in df_eod (per ticker, MultiIndex level 0).
+    color:
+        Plot color used in stacked bars.
+
+    frozen=True makes it immutable (good for constants).
+    slots=True reduces memory/overhead (nice but optional).
+    """
+    plot_group: int
+    period_days: int
+    pct: float
+    up_col: str
+    down_col: str
+    color: str
+
+
 #==========================================================================================
 # Other Dataclasses
 #==========================================================================================
