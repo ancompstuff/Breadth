@@ -108,7 +108,7 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
         fontsize=12
     )
     # Rótulo de eixo atualizado
-    ax1_twin.set_ylabel('Porcentagem de papéis (%)')
+    ax1_twin.set_ylabel('Stacked % de ativos')
     ax1_twin.grid(True, axis='y', alpha=0.7)
 
     # Combine legends
@@ -179,7 +179,7 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
         bottom += p2_norm[column]
 
     # Rótulo de eixo atualizado
-    ax2_twin.set_ylabel('Porcentagem de papéis (Altos - Baixos)')
+    ax2_twin.set_ylabel('Stacked % de ativos (Altos - Baixos)')
 
     ax2_twin.grid(True, axis='y', alpha=0.7)
 
