@@ -322,6 +322,21 @@ BREAKOUT_THRUST_Z_THRESHOLD: float = 2.0  # "unusually broad" breakout participa
 BREAKOUT_REGIME_SHADE_ALPHA: float = 0.12
 
 
+# --------------------------
+# TTM Squeeze
+# --------------------------
+PRICE_COL = "Adj Close"
+HIGH_COL = "High"
+LOW_COL = "Low"
+
+TTM_SQUEEZE_DEFAULTS = {
+    "length": 20,
+    "bb_mult": 2.0,
+    "kc_mult": 1.5,
+    "use_true_range": True,
+    "squeeze_regime_threshold_pct": 20.0,
+}
+
 
 """trend_combinations = {
         # --- ABOVE MA ---
@@ -361,4 +376,5 @@ BREAKOUT_REGIME_SHADE_ALPHA: float = 0.12
         "<VWMA_50_100": ["AboveBelowVWMA50", "AboveBelowVWMA100"],
         "<VWMA_50_100_200": ["AboveBelowVWMA50", "AboveBelowVWMA100", "AboveBelowVWMA200"]
     }
+   
 """

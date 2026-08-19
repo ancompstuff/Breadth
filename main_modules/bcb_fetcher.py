@@ -79,18 +79,76 @@ def fetch_series(
     - Uses JSON for all requests (robust).
     - For legacy series (11,1178) does extra cleaning and converts 0->NaN (holidays).
     - Respects max_years per chunk.
+    - NEW: Tries fetching without date params first (more reliable), falls back to chunked with dates.
     """
     if debug:
         print(f"[bcb_fetcher] fetch_series() sgs_code={sgs_code} start={start} end={end}")
 
+    headers = {"User-Agent": "python-requests-bcb-fetcher/1.0", "Accept": "application/json"}
+    
+    # STRATEGY 1: Try fetching ALL data without date parameters (more reliable)
+    # Then filter locally to desired date range
+    url = BASE_URL.format(code=sgs_code)
+    try:
+        if debug:
+            print(f"  -> Attempting fetch without date parameters (full history)")
+        r = requests.get(url, params={"formato": "json"}, headers=headers, timeout=60)
+        r.raise_for_status()
+        data_json = r.json()
+        
+        if data_json and len(data_json) > 0:
+            df = _df_from_json_list(data_json)
+            
+            # require expected columns
+            if "data" not in df.columns or "valor" not in df.columns:
+                raise ValueError("Unexpected JSON columns")
+            
+            # parse dates
+            df["data"] = pd.to_datetime(df["data"], format="%d/%m/%Y", errors="coerce")
+            
+            # clean numeric values
+            if sgs_code in LEGACY_JSON_ALWAYS:
+                df["valor"] = df["valor"].apply(_clean_val_str_to_float)
+            else:
+                def _safe_numeric(x):
+                    if x is None:
+                        return None
+                    if isinstance(x, (int, float)) and (not (isinstance(x, float) and math.isnan(x))):
+                        return float(x)
+                    return _clean_val_str_to_float(x)
+                df["valor"] = df["valor"].apply(_safe_numeric)
+            
+            df["valor"] = pd.to_numeric(df["valor"], errors="coerce")
+            
+            if sgs_code in LEGACY_JSON_ALWAYS:
+                df.loc[df["valor"] == 0, "valor"] = pd.NA
+            
+            # Filter to requested date range
+            df = df[(df["data"] >= pd.to_datetime(start)) & (df["data"] <= pd.to_datetime(end))]
+            
+            series = df.set_index("data")["valor"].astype("float64")
+            series.name = str(sgs_code)
+            
+            if sgs_code in LEGACY_JSON_ALWAYS:
+                if debug:
+                    print(f"  -> forward-filling legacy daily series {sgs_code}")
+                series = series.ffill()
+            
+            if debug:
+                print(f"  -> fetched {len(series)} observations for sgs_code {sgs_code} (from {series.index.min() if len(series)>0 else 'N/A'} to {series.index.max() if len(series)>0 else 'N/A'})")
+            
+            return series
+            
+    except Exception as e:
+        if debug:
+            print(f"  -> Full-history fetch failed: {e}, falling back to chunked with date params")
+    
+    # STRATEGY 2: Fall back to chunked requests with date parameters (original method)
     chunks = list(_generate_chunks(start, end, max_years=max_years))
     all_dfs = []
 
-    headers = {"User-Agent": "python-requests-bcb-fetcher/1.0", "Accept": "application/json"}
-
     for cs, ce in chunks:
         params = {"formato": "json", "dataInicial": _date_to_str(cs), "dataFinal": _date_to_str(ce)}
-        url = BASE_URL.format(code=sgs_code)
         if debug:
             print(f"  -> chunk {cs} to {ce} (params: {params})")
         try:

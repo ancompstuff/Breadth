@@ -131,6 +131,7 @@ def compute_indicators(index_df, components_df, ps):
     import indicators.ma_indicators_2 as mai2
     import indicators.adv_dec_indicators as adi
     from indicators.breakout_indicators import add_breakout_columns
+    from indicators.ttm_volatility import compute_aggregate_ttm_squeeze
 
     out_close_vol = compute_close_vol_obv(index_df, components_df)
 
@@ -156,6 +157,17 @@ def compute_indicators(index_df, components_df, ps):
         df_idx_mas, df_eod_mas
     )
 
+    agg_ttm_squeeze = compute_aggregate_ttm_squeeze(
+        index_df=index_df,
+        components_df=components_df,
+        # keep None => function decides how to default (recommended)
+        length=None,
+        bb_mult=None,
+        kc_mult=None,
+        use_true_range=None,
+        agg_method="median",
+    )
+
     ladder, mini_ladders = mai2.build_vwma_ladders(df_eod_mas, index_df)
 
     return {
@@ -168,6 +180,7 @@ def compute_indicators(index_df, components_df, ps):
         "idx_agg": df_idx_agg,
         "idx_compress": df_idx_compress,
         "comp_compress": df_comp_compress,
+        "agg_ttm_squeeze": agg_ttm_squeeze,
         "ladder": ladder,
         "mini_ladders": mini_ladders,
     }  #  this is a dictionary, currently with no name. Named in main.py
@@ -187,6 +200,7 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
     import plotting.plot_ma_indicators_1 as pmai
     import plotting.plot_ma_indicators_2 as pmai2
     import plotting.plot_adv_dec as pad
+    from plotting.plot_ttm_volatility import plot_aggregate_ttm_squeeze
     from plotting.plot_bcb_grid import plot_bcb_grid
     import plotting.plot_bvsp_vs_indexes as ppbi
 
@@ -235,6 +249,13 @@ def build_figures(ps, ps_long, indicators, df_bcb_daily, usd_series, fileloc):
             ps,
             indicators["ladder"],
             indicators["mini_ladders"],  # for panels 1-3
+        )
+    )
+
+    figs.append(
+        plot_aggregate_ttm_squeeze(
+            ps,
+            indicators["agg_ttm_squeeze"]
         )
     )
 

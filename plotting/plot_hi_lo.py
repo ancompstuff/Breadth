@@ -32,6 +32,7 @@ def plot_highs_and_lows(ps: PlotSetup, hl_df: pd.DataFrame) -> plt.Figure:
 
     # Extract the data we need
     lookback = ps.lookback_period
+
     idx = ps.idx
     num_tickers = ps.num_tickers  # Total number of stocks
 
